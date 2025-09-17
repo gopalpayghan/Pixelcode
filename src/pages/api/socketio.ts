@@ -57,8 +57,13 @@ const SocketHandler = (req: NextApiRequest, res: NextApiResponseServerIO) => {
       cors: {
         origin:
           process.env.NODE_ENV === "production"
-            ? ["https://your-domain.com"] // Replace with your actual domain
-            : ["http://localhost:3000"],
+            ? [
+                process.env.NEXT_PUBLIC_VERCEL_URL
+                  ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+                  : "https://your-pixelcode-app.vercel.app", // Replace with your actual Vercel domain
+                "https://*.vercel.app", // Allow all Vercel preview deployments
+              ]
+            : ["http://localhost:3001", "http://localhost:3000"],
         credentials: true,
       },
     });
