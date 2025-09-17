@@ -19,8 +19,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Code Craft",
+  title: "PixelCode - Interactive Code Editor",
   description: "Share and run code snippets",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/pixelcode.png",
+    apple: "/pixelcode.png",
+  },
 };
 
 export default function RootLayout({
