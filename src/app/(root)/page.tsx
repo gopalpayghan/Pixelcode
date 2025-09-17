@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import EditorPanel from "./_components/EditorPanel";
 import Header from "./_components/Header";
 import OutputPanel from "./_components/OutputPanel";
+import { EditorPanelSkeleton } from "./_components/EditorPanelSkeleton";
 
 export default function Home() {
   return (
@@ -9,7 +11,9 @@ export default function Home() {
         <Header />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <EditorPanel />
+          <Suspense fallback={<EditorPanelSkeleton />}>
+            <EditorPanel />
+          </Suspense>
           <OutputPanel />
         </div>
       </div>

@@ -13,10 +13,33 @@ import CopyButton from "./_components/CopyButton";
 import Comments from "./_components/Comments";
 
 function SnippetDetailPage() {
-  const snippetId = useParams().id;
+  const params = useParams();
+  const snippetId = params?.id as string | undefined;
 
-  const snippet = useQuery(api.snippets.getSnippetById, { snippetId: snippetId as Id<"snippets"> });
-  const comments = useQuery(api.snippets.getComments, { snippetId: snippetId as Id<"snippets"> });
+  // Always call hooks first
+  const snippet = useQuery(
+    api.snippets.getSnippetById,
+    snippetId ? { snippetId: snippetId as Id<"snippets"> } : "skip"
+  );
+  const comments = useQuery(
+    api.snippets.getComments,
+    snippetId ? { snippetId: snippetId as Id<"snippets"> } : "skip"
+  );
+
+  // Return early if no snippet ID is provided
+  if (!snippetId || typeof snippetId !== "string") {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f]">
+        <NavigationHeader />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center text-red-400">
+            <h1 className="text-2xl font-bold mb-4">Snippet Not Found</h1>
+            <p>The requested snippet could not be found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (snippet === undefined) return <SnippetLoadingSkeleton />;
 
@@ -48,7 +71,9 @@ function SnippetDetailPage() {
                     </div>
                     <div className="flex items-center gap-2 text-[#8b8b8d]">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(snippet._creationTime).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(snippet._creationTime).toLocaleDateString()}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-[#8b8b8d]">
                       <MessageSquare className="w-4 h-4" />
