@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -32,15 +32,19 @@ const TABS = [
 ];
 
 function ProfilePage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoading } = useAuthContext();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"executions" | "starred">("executions");
+  const [activeTab, setActiveTab] = useState<"executions" | "starred">(
+    "executions",
+  );
 
   const userStats = useQuery(api.codeExecutions.getUserStats, {
-    userId: user?.id ?? "",
+    userId: user?.userId ?? "",
   });
 
-  const starredSnippets = useQuery(api.snippets.getStarredSnippets);
+  const starredSnippets = useQuery(api.snippets.getStarredSnippets, {
+    userId: user?.userId ?? "",
+  });
 
   const {
     results: executions,
@@ -50,19 +54,19 @@ function ProfilePage() {
   } = usePaginatedQuery(
     api.codeExecutions.getUserExecutions,
     {
-      userId: user?.id ?? "",
+      userId: user?.userId ?? "",
     },
-    { initialNumItems: 5 }
+    { initialNumItems: 5 },
   );
 
-  const userData = useQuery(api.users.getUser, { userId: user?.id ?? "" });
+  const userData = useQuery(api.users.getUser, { userId: user?.userId ?? "" });
 
   const handleLoadMore = () => {
     if (executionStatus === "CanLoadMore") loadMore(5);
   };
 
-  if (!user && isLoaded) {
-    router.push("/");
+  if (!isLoading && !user) {
+    router.push("/sign-in");
     return null;
   }
 
@@ -72,18 +76,24 @@ function ProfilePage() {
         <NavigationHeader />
 
         <main className="max-w-page-narrow mx-auto px-4 sm:px-6 py-8 sm:py-12">
-          {userStats && userData && (
-            <ProfileHeader userStats={userStats} userData={userData} user={user!} />
+          {userStats && userData && user && (
+            <ProfileHeader
+              userStats={userStats}
+              userData={userData}
+              user={user}
+            />
           )}
 
-          {(userStats === undefined || !isLoaded) && <ProfileHeaderSkeleton />}
+          {(userStats === undefined || isLoading) && <ProfileHeaderSkeleton />}
 
           <Card variant="default" padding="none" className="overflow-hidden">
             <div className="border-b border-hairline px-4 pt-3 flex gap-2">
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as "executions" | "starred")}
+                  onClick={() =>
+                    setActiveTab(tab.id as "executions" | "starred")
+                  }
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-t-md text-body-sm font-medium transition-colors border-b-2 ${
                     activeTab === tab.id
                       ? "border-link text-ink bg-canvas-soft"
@@ -126,7 +136,9 @@ function ProfilePage() {
                                   {execution.language}
                                 </span>
                                 <span className="text-caption text-mute ml-3">
-                                  {new Date(execution._creationTime).toLocaleString()}
+                                  {new Date(
+                                    execution._creationTime,
+                                  ).toLocaleString()}
                                 </span>
                               </div>
                             </div>
@@ -143,7 +155,10 @@ function ProfilePage() {
                           </div>
 
                           <div className="p-4 space-y-3">
-                            <CodeBlock code={execution.code} language={execution.language} />
+                            <CodeBlock
+                              code={execution.code}
+                              language={execution.language}
+                            />
 
                             {(execution.output || execution.error) && (
                               <div className="p-3 rounded-md bg-canvas border border-hairline">
@@ -166,21 +181,31 @@ function ProfilePage() {
                       {isLoadingExecutions && (
                         <div className="text-center py-12">
                           <Loader2 className="w-8 h-8 text-mute mx-auto mb-3 animate-spin" />
-                          <p className="text-body-sm text-mute">Loading execution history...</p>
+                          <p className="text-body-sm text-mute">
+                            Loading execution history...
+                          </p>
                         </div>
                       )}
 
                       {!isLoadingExecutions && executions?.length === 0 && (
                         <div className="text-center py-12">
                           <Code className="w-8 h-8 text-mute mx-auto mb-3" />
-                          <h3 className="text-body-md font-semibold text-ink mb-1">No executions yet</h3>
-                          <p className="text-body-sm text-mute">Run code in the editor to view history here.</p>
+                          <h3 className="text-body-md font-semibold text-ink mb-1">
+                            No executions yet
+                          </h3>
+                          <p className="text-body-sm text-mute">
+                            Run code in the editor to view history here.
+                          </p>
                         </div>
                       )}
 
                       {executionStatus === "CanLoadMore" && (
                         <div className="flex justify-center pt-4">
-                          <Button variant="secondary" size="sm" onClick={handleLoadMore}>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleLoadMore}
+                          >
                             Load More Executions
                           </Button>
                         </div>
@@ -218,7 +243,11 @@ function ProfilePage() {
 
                               <div className="flex items-center gap-2 text-caption text-mute mb-3">
                                 <Clock className="w-3.5 h-3.5" />
-                                <span>{new Date(snippet._creationTime).toLocaleDateString()}</span>
+                                <span>
+                                  {new Date(
+                                    snippet._creationTime,
+                                  ).toLocaleDateString()}
+                                </span>
                               </div>
 
                               <div className="bg-canvas border border-hairline rounded-md p-3">
@@ -234,8 +263,12 @@ function ProfilePage() {
                       {(!starredSnippets || starredSnippets.length === 0) && (
                         <div className="col-span-full text-center py-12">
                           <Star className="w-8 h-8 text-mute mx-auto mb-3" />
-                          <h3 className="text-body-md font-semibold text-ink mb-1">No starred snippets</h3>
-                          <p className="text-body-sm text-mute">Explore community snippets and star your favorites!</p>
+                          <h3 className="text-body-md font-semibold text-ink mb-1">
+                            No starred snippets
+                          </h3>
+                          <p className="text-body-sm text-mute">
+                            Explore community snippets and star your favorites!
+                          </p>
                         </div>
                       )}
                     </div>

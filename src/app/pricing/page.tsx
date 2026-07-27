@@ -1,4 +1,4 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import ProPlanView from "./_components/ProPlanView";
@@ -6,21 +6,24 @@ import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { ENTERPRISE_FEATURES } from "./_constants";
 import { Check, Sparkles, Zap } from "lucide-react";
-import { SignedIn, SignedOut } from "@clerk/nextjs";
 import UpgradeButton from "./_components/UpgradeButton";
 import LoginButton from "@/components/LoginButton";
 import { Card } from "@/components/ui/Card";
+import { verifySessionToken } from "@/lib/auth";
 
 async function PricingPage() {
-  const user = await currentUser();
+  const cookieStore = await cookies();
+  const token = cookieStore.get("pixelcode_token")?.value;
+  const userPayload = token ? verifySessionToken(token) : null;
+
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   let isPro = false;
 
-  if (convexUrl && user?.id) {
+  if (convexUrl && userPayload?.userId) {
     try {
       const convex = new ConvexHttpClient(convexUrl);
       const convexUser = await convex.query(api.users.getUser, {
-        userId: user.id,
+        userId: userPayload.userId,
       });
       isPro = !!convexUser?.isPro;
     } catch (e) {
@@ -134,12 +137,7 @@ async function PricingPage() {
               </div>
 
               <div className="mt-8">
-                <SignedIn>
-                  <UpgradeButton />
-                </SignedIn>
-                <SignedOut>
-                  <LoginButton />
-                </SignedOut>
+                {userPayload ? <UpgradeButton /> : <LoginButton />}
               </div>
             </Card>
 

@@ -8,13 +8,23 @@ import SnippetLoadingSkeleton from "./_components/SnippetLoadingSkeleton";
 import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { Clock, Code, MessageSquare, User, Play, ArrowLeft } from "lucide-react";
-import { Editor } from "@monaco-editor/react";
+import dynamic from "next/dynamic";
 import { defineMonacoThemes, LANGUAGE_CONFIG } from "@/lib/constants";
 import CopyButton from "./_components/CopyButton";
 import Comments from "./_components/Comments";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
+
+const Editor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[450px] bg-[#0d1117] text-caption text-mute font-mono">
+      <div className="w-4 h-4 border-2 border-hairline border-t-link rounded-full animate-spin mr-2" />
+      Loading Code Preview...
+    </div>
+  ),
+});
 
 function SnippetDetailPage() {
   const params = useParams();

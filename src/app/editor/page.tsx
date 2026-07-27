@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, Suspense } from "react";
 import NavigationHeader from "@/components/NavigationHeader";
 import EditorTopBar from "./_components/EditorTopBar";
@@ -8,10 +8,19 @@ import CodePanel from "./_components/CodePanel";
 import OutputPanel from "./_components/OutputPanel";
 import StatusBar from "./_components/StatusBar";
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 
 function EditorContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { user, isLoading } = useAuthContext();
   const { setLanguage } = useCodeEditorStore();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/sign-in?redirect=/editor");
+    }
+  }, [isLoading, user, router]);
 
   useEffect(() => {
     const lang = searchParams?.get("lang");
@@ -19,6 +28,10 @@ function EditorContent() {
       setLanguage(lang);
     }
   }, [searchParams, setLanguage]);
+
+  if (!isLoading && !user) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-canvas">

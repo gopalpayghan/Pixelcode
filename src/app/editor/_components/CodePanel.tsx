@@ -2,10 +2,20 @@
 
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, defineMonacoThemes } from "@/lib/constants";
-import Editor, { Monaco, OnMount } from "@monaco-editor/react";
+import type { Monaco, OnMount } from "@monaco-editor/react";
 import { Code2, FileCode } from "lucide-react";
-
+import dynamic from "next/dynamic";
 import useMounted from "@/hooks/useMounted";
+
+const Editor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full bg-canvas text-caption text-mute font-mono">
+      <div className="w-4 h-4 border-2 border-hairline border-t-link rounded-full animate-spin mr-2" />
+      Loading Editor...
+    </div>
+  ),
+});
 
 export default function CodePanel() {
   const mounted = useMounted();

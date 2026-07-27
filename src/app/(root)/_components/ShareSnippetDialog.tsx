@@ -1,24 +1,38 @@
+"use client";
+
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { useMutation } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { X } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 
 function ShareSnippetDialog({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [isSharing, setIsSharing] = useState(false);
+  const { user } = useAuthContext();
   const { language, getCode } = useCodeEditorStore();
   const createSnippet = useMutation(api.snippets.createSnippet);
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      toast.error("You must be logged in to share snippets.");
+      return;
+    }
 
     setIsSharing(true);
 
     try {
       const code = getCode();
-      await createSnippet({ title, language, code });
+      await createSnippet({
+        userId: user.userId,
+        userName: user.name,
+        title,
+        language,
+        code,
+      });
       onClose();
       setTitle("");
       toast.success("Snippet shared successfully");

@@ -1,12 +1,28 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default clerkMiddleware();
+export function middleware(request: NextRequest) {
+  const token = request.cookies.get("pixelcode_token")?.value;
+  const { pathname } = request.nextUrl;
+
+  // Protected routes requiring authentication before accessing
+  const protectedRoutes = ["/profile", "/editor", "/collaborate"];
+
+  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
+    if (!token) {
+      const signInUrl = new URL("/sign-in", request.url);
+      signInUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(signInUrl);
+    }
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
+    "/profile/:path*",
+    "/editor/:path*",
+    "/collaborate/:path*",
   ],
 };

@@ -4,8 +4,12 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, Play } from "lucide-react";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 
 export default function HeroBand() {
+  const { user } = useAuthContext();
+  const startCodingUrl = user ? "/editor" : "/sign-in?redirect=/editor";
+
   return (
     <section className="relative overflow-hidden">
       {/* Mesh gradient backdrop */}
@@ -59,7 +63,7 @@ export default function HeroBand() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
           >
-            <Link href="/editor">
+            <Link href={startCodingUrl} prefetch={true}>
               <Button
                 variant="primary"
                 size="lg"
@@ -69,7 +73,7 @@ export default function HeroBand() {
                 Start Coding
               </Button>
             </Link>
-            <Link href="/snippets">
+            <Link href="/snippets" prefetch={true}>
               <Button
                 variant="secondary"
                 size="lg"

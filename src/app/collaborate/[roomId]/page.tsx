@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import NavigationHeader from "@/components/NavigationHeader";
 import EditorTopBar from "@/app/editor/_components/EditorTopBar";
 import CodePanel from "@/app/editor/_components/CodePanel";
@@ -24,7 +24,7 @@ export default function CollaborativeRoomPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params?.roomId as string;
-  const { user } = useUser();
+  const { user } = useAuthContext();
   const { socket, isConnected } = useSocket();
 
   const [copied, setCopied] = useState(false);
@@ -40,9 +40,9 @@ export default function CollaborativeRoomPage() {
     socket.emit("join-room", {
       roomId,
       user: {
-        id: user.id,
-        name: user.fullName || user.username || "Anonymous",
-        avatar: user.imageUrl,
+        id: user.userId,
+        name: user.name || "Anonymous",
+        avatar: user.avatar,
       },
     });
 

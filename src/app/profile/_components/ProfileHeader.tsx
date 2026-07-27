@@ -5,7 +5,6 @@ import { api } from "../../../../convex/_generated/api";
 import { Activity, Code2, Star, Timer, TrendingUp, Trophy, UserIcon, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { UserResource } from "@clerk/types";
 import { Card } from "@/components/ui/Card";
 
 interface ProfileHeaderProps {
@@ -29,11 +28,18 @@ interface ProfileHeaderProps {
     email: string;
     isPro: boolean;
   };
-  user: UserResource;
+  user: {
+    userId: string;
+    name: string;
+    email: string;
+    avatar?: string;
+  };
 }
 
 function ProfileHeader({ userStats, userData, user }: ProfileHeaderProps) {
-  const starredSnippets = useQuery(api.snippets.getStarredSnippets);
+  const starredSnippets = useQuery(api.snippets.getStarredSnippets, {
+    userId: user.userId,
+  });
 
   const STATS = [
     {
@@ -77,11 +83,17 @@ function ProfileHeader({ userStats, userData, user }: ProfileHeaderProps) {
       <Card variant="default" className="p-6 sm:p-8 mb-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
           <div className="relative">
-            <img
-              src={user.imageUrl}
-              alt="Profile"
-              className="w-20 h-20 rounded-full border-2 border-hairline object-cover"
-            />
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt="Profile"
+                className="w-20 h-20 rounded-full border-2 border-hairline object-cover"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-full border-2 border-hairline bg-link/10 text-link text-display-md font-semibold flex items-center justify-center uppercase">
+                {user.name.charAt(0)}
+              </div>
+            )}
             {userData.isPro && (
               <div className="absolute -top-1 -right-1 bg-link text-white p-1.5 rounded-full shadow-level-2">
                 <Zap className="w-3.5 h-3.5 fill-current" />

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
 import ConvexClientProvider from "@/components/providers/ConvexClientProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = localFont({
@@ -48,30 +48,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en" className="dark" suppressHydrationWarning>
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
-        >
-          <ConvexClientProvider>
-            {children}
-          </ConvexClientProvider>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
+        suppressHydrationWarning
+      >
+        <AuthProvider>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </AuthProvider>
 
-          <Toaster
-            position="bottom-right"
-            toastOptions={{
-              style: {
-                background: "var(--color-canvas-elevated)",
-                color: "var(--color-ink)",
-                border: "1px solid var(--color-hairline)",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontFamily: "var(--font-geist-sans)",
-              },
-            }}
-          />
-        </body>
-      </html>
-    </ClerkProvider>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "var(--color-canvas-elevated)",
+              color: "var(--color-ink)",
+              border: "1px solid var(--color-hairline)",
+              borderRadius: "8px",
+              fontSize: "14px",
+              fontFamily: "var(--font-geist-sans)",
+            },
+          }}
+        />
+      </body>
+    </html>
   );
 }

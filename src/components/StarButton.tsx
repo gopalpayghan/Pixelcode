@@ -1,19 +1,22 @@
-import { useAuth } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Star } from "lucide-react";
 
 function StarButton({ snippetId }: { snippetId: Id<"snippets"> }) {
-  const { isSignedIn } = useAuth();
+  const { user } = useAuthContext();
 
-  const isStarred = useQuery(api.snippets.isSnippetStarred, { snippetId });
+  const isStarred = useQuery(
+    api.snippets.isSnippetStarred,
+    user?.userId ? { snippetId, userId: user.userId } : "skip"
+  );
   const starCount = useQuery(api.snippets.getSnippetStarCount, { snippetId });
   const star = useMutation(api.snippets.starSnippet);
 
   const handleStar = async () => {
-    if (!isSignedIn) return;
-    await star({ snippetId });
+    if (!user) return;
+    await star({ snippetId, userId: user.userId });
   };
 
   return (
@@ -21,16 +24,16 @@ function StarButton({ snippetId }: { snippetId: Id<"snippets"> }) {
       className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg 
     transition-all duration-200 ${
       isStarred
-        ? "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20"
-        : "bg-gray-500/10 text-gray-400 hover:bg-gray-500/20"
+        ? "bg-warning/10 text-warning hover:bg-warning/20"
+        : "bg-canvas-soft text-mute hover:text-ink"
     }`}
       onClick={handleStar}
     >
       <Star
-        className={`w-4 h-4 ${isStarred ? "fill-yellow-500" : "fill-none group-hover:fill-gray-400"}`}
+        className={`w-4 h-4 ${isStarred ? "fill-warning text-warning" : "fill-none text-mute group-hover:text-ink"}`}
       />
-      <span className={`text-xs font-medium ${isStarred ? "text-yellow-500" : "text-gray-400"}`}>
-        {starCount}
+      <span className={`text-xs font-medium ${isStarred ? "text-warning" : "text-mute"}`}>
+        {starCount ?? 0}
       </span>
     </button>
   );

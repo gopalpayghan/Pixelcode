@@ -1,7 +1,7 @@
 "use client";
 
 import { Snippet } from "@/types";
-import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useState } from "react";
@@ -13,7 +13,7 @@ import toast from "react-hot-toast";
 import StarButton from "@/components/StarButton";
 
 function SnippetCard({ snippet }: { snippet: Snippet }) {
-  const { user } = useUser();
+  const { user } = useAuthContext();
   const deleteSnippet = useMutation(api.snippets.deleteSnippet);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -22,8 +22,9 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
     e.stopPropagation();
     setIsDeleting(true);
 
+    if (!user) return;
     try {
-      await deleteSnippet({ snippetId: snippet._id });
+      await deleteSnippet({ snippetId: snippet._id, userId: user.userId });
       toast.success("Snippet deleted");
     } catch (error) {
       console.log("Error deleting snippet:", error);
@@ -68,7 +69,7 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
               >
                 <StarButton snippetId={snippet._id} />
 
-                {user?.id === snippet.userId && (
+                {user?.userId === snippet.userId && (
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting}
