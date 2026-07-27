@@ -3,16 +3,14 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import ConvexClientProvider from "@/components/providers/ConvexClientProvider";
-import { SocketProvider } from "@/components/providers/SocketProvider";
-import Footer from "@/components/Footer";
 import { Toaster } from "react-hot-toast";
-import { SimpleLoader } from "@/components/SimpleLoader";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
   weight: "100 900",
 });
+
 const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
@@ -20,12 +18,27 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "PixelCode - Interactive Code Editor",
-  description: "Share and run code snippets",
+  title: "PixelCode — Online Code Editor & Collaboration Platform",
+  description:
+    "Write, run, and collaborate on code in 10+ languages. Real-time pair programming, community snippets, and a premium coding experience.",
+  keywords: [
+    "online code editor",
+    "code compiler",
+    "real-time collaboration",
+    "pair programming",
+    "code snippets",
+    "pixelcode",
+  ],
   icons: {
     icon: "/favicon.ico",
     shortcut: "/pixelcode.png",
     apple: "/pixelcode.png",
+  },
+  openGraph: {
+    title: "PixelCode — Online Code Editor & Collaboration Platform",
+    description:
+      "Write, run, and collaborate on code in 10+ languages with a premium developer experience.",
+    type: "website",
   },
 };
 
@@ -36,63 +49,29 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <head>
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `
-              .initial-loader {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: #000;
-                z-index: 9999;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-              }
-              .initial-loader .spinner {
-                width: 64px;
-                height: 64px;
-                border: 4px solid #374151;
-                border-top: 4px solid #fff;
-                border-radius: 50%;
-                animation: spin 1s linear infinite;
-              }
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-              .initial-loader.hidden {
-                display: none;
-              }
-            `,
-            }}
-          />
-        </head>
+      <html lang="en" className="dark" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-900 to-gray-950 text-gray-100 flex flex-col`}
-          suppressHydrationWarning={true}
+          className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
         >
-          {/* Initial CSS loader - shows immediately */}
-          <div id="initial-loader" className="initial-loader">
-            <div className="spinner"></div>
-          </div>
-
-          <SimpleLoader />
           <ConvexClientProvider>
-            <SocketProvider>{children}</SocketProvider>
+            {children}
           </ConvexClientProvider>
 
-          <Footer />
-
-          <Toaster />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "var(--color-canvas-elevated)",
+                color: "var(--color-ink)",
+                border: "1px solid var(--color-hairline)",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontFamily: "var(--font-geist-sans)",
+              },
+            }}
+          />
         </body>
       </html>
     </ClerkProvider>
   );
 }
-
-// https://emkc.org/api/v2/piston/runtimes

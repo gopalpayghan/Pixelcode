@@ -25,14 +25,14 @@ export default defineSchema({
     title: v.string(),
     language: v.string(),
     code: v.string(),
-    userName: v.string(), // store user's name for easy access
+    userName: v.string(),
   }).index("by_user_id", ["userId"]),
 
   snippetComments: defineTable({
     snippetId: v.id("snippets"),
     userId: v.string(),
     userName: v.string(),
-    content: v.string(), // This will store HTML content
+    content: v.string(),
   }).index("by_snippet_id", ["snippetId"]),
 
   stars: defineTable({
@@ -42,4 +42,16 @@ export default defineSchema({
     .index("by_user_id", ["userId"])
     .index("by_snippet_id", ["snippetId"])
     .index("by_user_id_and_snippet_id", ["userId", "snippetId"]),
+
+  collaborativeSessions: defineTable({
+    roomId: v.string(),
+    hostUserId: v.string(),
+    hostUserName: v.string(),
+    language: v.string(),
+    code: v.string(),
+    title: v.string(),
+    isActive: v.boolean(),
+  })
+    .index("by_room_id", ["roomId"])
+    .index("by_host_user_id", ["hostUserId"]),
 });

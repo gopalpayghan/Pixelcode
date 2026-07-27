@@ -1,5 +1,4 @@
 import { CodeEditorState } from "./../types/index";
-import { LANGUAGE_CONFIG } from "@/app/(root)/_constants";
 import { create } from "zustand";
 import { Monaco } from "@monaco-editor/react";
 
@@ -29,6 +28,12 @@ interface CollaborativeState {
 }
 
 interface EnhancedCodeEditorState extends CodeEditorState, CollaborativeState {
+  // STDIN & Output Tab support
+  stdin: string;
+  setStdin: (stdin: string) => void;
+  activeOutputTab: "console" | "stdin";
+  setActiveOutputTab: (tab: "console" | "stdin") => void;
+
   // Collaborative methods
   setCollaborativeMode: (enabled: boolean) => void;
   setCurrentRoomId: (roomId: string | null) => void;
@@ -40,8 +45,20 @@ interface EnhancedCodeEditorState extends CodeEditorState, CollaborativeState {
   updateCodeFromRemote: (code: string) => void;
 }
 
+const JUDGE0_LANGUAGE_MAP: Record<string, number> = {
+  javascript: 63,
+  typescript: 74,
+  python: 71,
+  java: 62,
+  go: 60,
+  rust: 73,
+  cpp: 54,
+  csharp: 51,
+  ruby: 72,
+  swift: 83,
+};
+
 const getInitialState = () => {
-  // if we're on the server, return default values
   if (typeof window === "undefined") {
     return {
       language: "javascript",
@@ -50,7 +67,6 @@ const getInitialState = () => {
     };
   }
 
-  // if we're on the client, return values from local storage bc localStorage is a browser API.
   const savedLanguage = localStorage.getItem("editor-language") || "javascript";
   const savedTheme = localStorage.getItem("editor-theme") || "vs-dark";
   const savedFontSize = localStorage.getItem("editor-font-size") || 16;
@@ -73,6 +89,12 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       error: null,
       editor: null,
       executionResult: null,
+
+      // STDIN & Output Tab State
+      stdin: "",
+      setStdin: (stdin: string) => set({ stdin }),
+      activeOutputTab: "console",
+      setActiveOutputTab: (activeOutputTab: "console" | "stdin") => set({ activeOutputTab }),
 
       // Collaborative state
       isCollaborativeMode: false,
@@ -101,7 +123,6 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       },
 
       setLanguage: (language: string) => {
-        // Save current language code before switching
         const currentCode = get().editor?.getValue();
         if (currentCode) {
           localStorage.setItem(`editor-code-${get().language}`, currentCode);
@@ -117,7 +138,7 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       },
 
       runCode: async () => {
-        const { language, getCode } = get();
+        const { language, getCode, stdin } = get();
         const code = getCode();
 
         if (!code) {
@@ -125,82 +146,126 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
           return;
         }
 
-        set({ isRunning: true, error: null, output: "" });
+        set({ isRunning: true, error: null, output: "", activeOutputTab: "console" });
 
         try {
-          const runtime = LANGUAGE_CONFIG[language].pistonRuntime;
+          const languageId = JUDGE0_LANGUAGE_MAP[language] || 63;
+
           const response = await fetch(
-            "https://emkc.org/api/v2/piston/execute",
+            "https://ce.judge0.com/submissions?wait=true",
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                language: runtime.language,
-                version: runtime.version,
-                files: [{ content: code }],
+                language_id: languageId,
+                source_code: code,
+                stdin: stdin || "",
               }),
             }
           );
 
           const data = await response.json();
 
-          console.log("data back from piston:", data);
+          if (data.status && data.status.id !== 3) {
+            const errorMsg =
+              data.compile_output ||
+              data.stderr ||
+              data.message ||
+              data.status.description ||
+              "Execution Error";
 
-          // handle API-level erros
-          if (data.message) {
             set({
-              error: data.message,
-              executionResult: { code, output: "", error: data.message },
+              error: errorMsg.trim(),
+              executionResult: { code, output: "", error: errorMsg.trim() },
             });
             return;
           }
 
-          // handle compilation errors
-          if (data.compile && data.compile.code !== 0) {
-            const error = data.compile.stderr || data.compile.output;
+          if (data.stderr) {
             set({
-              error,
-              executionResult: {
-                code,
-                output: "",
-                error,
-              },
+              error: data.stderr.trim(),
+              executionResult: { code, output: "", error: data.stderr.trim() },
             });
             return;
           }
 
-          if (data.run && data.run.code !== 0) {
-            const error = data.run.stderr || data.run.output;
-            set({
-              error,
-              executionResult: {
-                code,
-                output: "",
-                error,
-              },
-            });
-            return;
-          }
-
-          // if we get here, execution was successful
-          const output = data.run.output;
+          const outputResult = data.stdout
+            ? data.stdout.trim()
+            : "Program executed successfully with no output.";
 
           set({
-            output: output.trim(),
+            output: outputResult,
             error: null,
             executionResult: {
               code,
-              output: output.trim(),
+              output: outputResult,
               error: null,
             },
           });
         } catch (error) {
+          if (language === "javascript") {
+            try {
+              const logs: string[] = [];
+              const customConsole = {
+                log: (...args: unknown[]) =>
+                  logs.push(
+                    args
+                      .map((a) =>
+                        typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                      )
+                      .join(" ")
+                  ),
+                error: (...args: unknown[]) =>
+                  logs.push(
+                    "Error: " +
+                      args
+                        .map((a) =>
+                          typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                        )
+                        .join(" ")
+                  ),
+                warn: (...args: unknown[]) =>
+                  logs.push(
+                    "Warning: " +
+                      args
+                        .map((a) =>
+                          typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                        )
+                        .join(" ")
+                  ),
+              };
+
+              const runFn = new Function("console", "stdin", code);
+              runFn(customConsole, stdin);
+
+              const clientOutput = logs.join("\n") || "Program executed successfully.";
+              set({
+                output: clientOutput,
+                error: null,
+                executionResult: { code, output: clientOutput, error: null },
+              });
+              return;
+            } catch (jsError: unknown) {
+              const errMsg =
+                jsError instanceof Error ? jsError.message : "Error running code";
+              set({
+                error: errMsg,
+                executionResult: { code, output: "", error: errMsg },
+              });
+              return;
+            }
+          }
+
           console.log("Error running code:", error);
           set({
-            error: "Error running code",
-            executionResult: { code, output: "", error: "Error running code" },
+            error: "Error running code. Please check your internet connection.",
+            executionResult: {
+              code,
+              output: "",
+              error: "Error running code. Please check your internet connection.",
+            },
           });
         } finally {
           set({ isRunning: false });
@@ -264,17 +329,14 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
         if (editor) {
           const currentCode = editor.getValue();
 
-          // Only update if the code is actually different
           if (currentCode !== code) {
             set({ isReceivingRemoteChange: true });
 
-            // Preserve cursor position for better UX
             const position = editor.getPosition();
             const selection = editor.getSelection();
 
             editor.setValue(code);
 
-            // Restore cursor position if possible
             if (position) {
               editor.setPosition(position);
             }
@@ -282,7 +344,6 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
               editor.setSelection(selection);
             }
 
-            // Immediately reset flag for instant responsiveness
             set({ isReceivingRemoteChange: false });
           }
         }

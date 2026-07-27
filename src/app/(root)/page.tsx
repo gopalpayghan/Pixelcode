@@ -1,22 +1,23 @@
-import { Suspense } from "react";
-import EditorPanel from "./_components/EditorPanel";
-import Header from "./_components/Header";
-import OutputPanel from "./_components/OutputPanel";
-import { EditorPanelSkeleton } from "./_components/EditorPanelSkeleton";
+import NavigationHeader from "@/components/NavigationHeader";
+import Footer from "@/components/Footer";
+import HeroBand from "./_components/HeroBand";
+import LanguageGrid from "./_components/LanguageGrid";
+import FeatureBand from "./_components/FeatureBand";
+import ShowcaseBand from "./_components/ShowcaseBand";
+import CTABand from "./_components/CTABand";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      <div className="max-w-[1800px] mx-auto p-4">
-        <Header />
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Suspense fallback={<EditorPanelSkeleton />}>
-            <EditorPanel />
-          </Suspense>
-          <OutputPanel />
-        </div>
-      </div>
-    </div>
+    <>
+      <NavigationHeader />
+      <main>
+        <HeroBand />
+        <LanguageGrid />
+        <FeatureBand />
+        <ShowcaseBand />
+        <CTABand />
+      </main>
+      <Footer />
+    </>
   );
 }

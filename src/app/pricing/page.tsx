@@ -3,148 +3,208 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
 import ProPlanView from "./_components/ProPlanView";
 import NavigationHeader from "@/components/NavigationHeader";
-import { ENTERPRISE_FEATURES, FEATURES } from "./_constants";
-import { Star } from "lucide-react";
-import FeatureCategory from "./_components/FeatureCategory";
-import FeatureItem from "./_components/FeatureItem";
+import Footer from "@/components/Footer";
+import { ENTERPRISE_FEATURES } from "./_constants";
+import { Check, Sparkles, Zap } from "lucide-react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import UpgradeButton from "./_components/UpgradeButton";
 import LoginButton from "@/components/LoginButton";
+import { Card } from "@/components/ui/Card";
 
 async function PricingPage() {
   const user = await currentUser();
-  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-  const convexUser = await convex.query(api.users.getUser, {
-    userId: user?.id || "",
-  });
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+  let isPro = false;
 
-  if (convexUser?.isPro) return <ProPlanView />;
+  if (convexUrl && user?.id) {
+    try {
+      const convex = new ConvexHttpClient(convexUrl);
+      const convexUser = await convex.query(api.users.getUser, {
+        userId: user.id,
+      });
+      isPro = !!convexUser?.isPro;
+    } catch (e) {
+      console.error("Convex pricing query error:", e);
+    }
+  }
+
+  if (isPro) return <ProPlanView />;
 
   return (
-    <div
-      className="relative min-h-screen bg-[#0a0a0f] selection:bg-blue-500/20
-     selection:text-blue-200"
-    >
-      <NavigationHeader />
+    <div className="min-h-screen bg-canvas flex flex-col justify-between">
+      <div>
+        <NavigationHeader />
 
-      {/* main content */}
-
-      <main className="relative pt-32 pb-24 px-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Hero   */}
-          <div className="text-center mb-24">
-            <div className="relative inline-block">
-              <div className="absolute -inset-px bg-gradient-to-r from-blue-500 to-purple-500 blur-xl opacity-10" />
-              <h1
-                className="relative text-5xl md:text-6xl lg:text-7xl font-semibold bg-gradient-to-r
-               from-gray-100 to-gray-300 text-transparent bg-clip-text mb-8"
-              >
-                Elevate Your <br />
-                Development Experience
-              </h1>
-            </div>
-            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-              Join the next generation of developers with our professional suite
-              of tools
+        <main className="max-w-page mx-auto px-4 sm:px-6 py-16 sm:py-24">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <span className="mono-label text-mute flex items-center justify-center gap-1.5 mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-warning" />
+              Simple Pricing
+            </span>
+            <h1 className="text-display-lg sm:text-display-xl text-ink text-balance">
+              Predictable pricing for developers.
+            </h1>
+            <p className="mt-3 text-body-lg text-body text-pretty">
+              Get full access to multi-language execution, live pair programming, and community snippet hosting.
             </p>
           </div>
 
-          {/* Enterprise Features */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-24">
-            {ENTERPRISE_FEATURES.map((feature) => (
-              <div
-                key={feature.label}
-                className="group relative bg-gradient-to-b from-[#12121a] to-[#0a0a0f] rounded-2xl p-6 hover:transform hover:scale-[1.02] transition-all duration-300"
-              >
-                <div className="relative">
-                  <div
-                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 
-                  flex items-center justify-center mb-4 ring-1 ring-gray-800/60 group-hover:ring-blue-500/20"
-                  >
-                    <feature.icon className="w-6 h-6 text-blue-400" />
-                  </div>
-
-                  <h3 className="text-lg font-medium text-white mb-2">
-                    {feature.label}
-                  </h3>
-                  <p className="text-gray-400">{feature.desc}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-20">
+            <Card variant="default" className="flex flex-col justify-between p-8">
+              <div>
+                <span className="text-body-sm font-semibold text-mute">Hobby</span>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-display-xl text-ink">$0</span>
+                  <span className="text-body-sm text-mute">/ forever</span>
                 </div>
+                <p className="mt-2 text-body-sm text-mute">
+                  Essential tools for learning and experimenting.
+                </p>
+
+                <ul className="mt-8 space-y-3 text-body-sm text-ink">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>JavaScript execution</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Monaco Code Editor</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Public Snippet library</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Real-time pair programming</span>
+                  </li>
+                </ul>
               </div>
-            ))}
+
+              <div className="mt-8">
+                <button
+                  disabled
+                  className="w-full py-2.5 rounded-full bg-canvas-soft border border-hairline text-body-sm text-mute font-medium"
+                >
+                  Current Plan
+                </button>
+              </div>
+            </Card>
+
+            <Card variant="featured" className="flex flex-col justify-between p-8 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-link text-white text-caption font-semibold uppercase tracking-wider shadow-level-2">
+                Most Popular
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-body-sm font-semibold text-primary-foreground">Pro Tier</span>
+                  <Zap className="w-4 h-4 text-warning fill-current" />
+                </div>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-display-xl text-primary-foreground">$39</span>
+                  <span className="text-body-sm opacity-80">one-time</span>
+                </div>
+                <p className="mt-2 text-body-sm opacity-80">
+                  Lifetime access for power developers and professionals.
+                </p>
+
+                <ul className="mt-8 space-y-3 text-body-sm text-primary-foreground">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-link" />
+                    <span className="font-medium">10+ Multi-language executions</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-link" />
+                    <span>Interactive STDIN support</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-link" />
+                    <span>Unlimited real-time collaboration rooms</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-link" />
+                    <span>Priority Piston execution queue</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-link" />
+                    <span>Pro profile badge & analytics</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-8">
+                <SignedIn>
+                  <UpgradeButton />
+                </SignedIn>
+                <SignedOut>
+                  <LoginButton />
+                </SignedOut>
+              </div>
+            </Card>
+
+            <Card variant="default" className="flex flex-col justify-between p-8">
+              <div>
+                <span className="text-body-sm font-semibold text-mute">Team</span>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-display-xl text-ink">$99</span>
+                  <span className="text-body-sm text-mute">/ month</span>
+                </div>
+                <p className="mt-2 text-body-sm text-mute">
+                  Dedicated collaboration tools for engineering teams.
+                </p>
+
+                <ul className="mt-8 space-y-3 text-body-sm text-ink">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Everything in Pro</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Up to 10 team seats</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Private workspace snippet store</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-success" />
+                    <span>Dedicated support SLA</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-8">
+                <button
+                  disabled
+                  className="w-full py-2.5 rounded-full bg-canvas-soft border border-hairline text-body-sm text-mute font-medium"
+                >
+                  Contact Sales
+                </button>
+              </div>
+            </Card>
           </div>
 
-          {/* Pricing Card */}
-
-          <div className="relative max-w-4xl mx-auto">
-            <div
-              className="absolute -inset-px bg-gradient-to-r from-blue-500
-             to-purple-500 rounded-2xl blur opacity-10"
-            />
-            <div className="relative bg-[#12121a]/90 backdrop-blur-xl rounded-2xl">
-              <div
-                className="absolute inset-x-0 -top-px h-px bg-gradient-to-r 
-              from-transparent via-blue-500/50 to-transparent"
-              />
-              <div className="absolute inset-x-0 -bottom-px h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
-
-              <div className="relative p-8 md:p-12">
-                {/* header */}
-                <div className="text-center mb-12">
-                  <div className="inline-flex p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-purple-500/10 ring-1 ring-gray-800/60 mb-6">
-                    <Star className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <h2 className="text-3xl font-semibold text-white mb-4">
-                    Lifetime Pro Access
-                  </h2>
-                  <div className="flex items-baseline justify-center gap-2 mb-4">
-                    <span className="text-2xl text-gray-400">$</span>
-                    <span className="text-6xl font-semibold bg-gradient-to-r from-gray-100 to-gray-300 text-transparent bg-clip-text">
-                      39
-                    </span>
-                    <span className="text-xl text-gray-400">one-time</span>
-                  </div>
-                  <p className="text-gray-400 text-lg">
-                    Unlock the full potential of Pixelcode
-                  </p>
-                </div>
-
-                {/* Features grid */}
-                <div className="grid md:grid-cols-3 gap-12 mb-12">
-                  <FeatureCategory label="Development">
-                    {FEATURES.development.map((feature, idx) => (
-                      <FeatureItem key={idx}>{feature}</FeatureItem>
-                    ))}
-                  </FeatureCategory>
-
-                  <FeatureCategory label="Collaboration">
-                    {FEATURES.collaboration.map((feature, idx) => (
-                      <FeatureItem key={idx}>{feature}</FeatureItem>
-                    ))}
-                  </FeatureCategory>
-
-                  <FeatureCategory label="Deployment">
-                    {FEATURES.deployment.map((feature, idx) => (
-                      <FeatureItem key={idx}>{feature}</FeatureItem>
-                    ))}
-                  </FeatureCategory>
-                </div>
-
-                {/* CTA */}
-                <div className="flex justify-center">
-                  <SignedIn>
-                    <UpgradeButton />
-                  </SignedIn>
-
-                  <SignedOut>
-                    <LoginButton />
-                  </SignedOut>
-                </div>
-              </div>
+          <div className="max-w-4xl mx-auto border-t border-hairline pt-16">
+            <h2 className="text-display-md text-ink text-center mb-10">
+              Built for performance and security.
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              {ENTERPRISE_FEATURES.map((feature) => (
+                <Card key={feature.label} variant="soft" padding="md">
+                  <feature.icon className="w-5 h-5 text-link mb-3" />
+                  <h3 className="text-body-sm font-semibold text-ink mb-1">{feature.label}</h3>
+                  <p className="text-caption text-mute">{feature.desc}</p>
+                </Card>
+              ))}
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
+
+      <Footer />
     </div>
   );
 }
+
 export default PricingPage;
