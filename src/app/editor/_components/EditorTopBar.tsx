@@ -4,7 +4,7 @@ import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, THEMES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
 import { Play, Share2, Terminal, Sliders, Check, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import useMounted from "@/hooks/useMounted";
 import ShareSnippetModal from "./ShareSnippetModal";
@@ -29,6 +29,53 @@ export default function EditorTopBar() {
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sync editor theme with main website theme (light / dark)
+  useEffect(() => {
+    if (!mounted) return;
+
+    const syncTheme = (mode?: "dark" | "light") => {
+      const siteTheme = mode || (localStorage.getItem("pixelcode-site-theme") as "dark" | "light") ||
+        (document.documentElement.classList.contains("light") ? "light" : "dark");
+
+      if (siteTheme === "light") {
+        setTheme("vs-light");
+      } else {
+        setTheme("vs-dark");
+      }
+    };
+
+    // Initial sync
+    syncTheme();
+
+    // Listen for theme toggle events
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<"dark" | "light">;
+      syncTheme(customEvent.detail);
+    };
+
+    window.addEventListener("pixelcode-theme-change", handleThemeChange);
+    return () => {
+      window.removeEventListener("pixelcode-theme-change", handleThemeChange);
+    };
+  }, [mounted, setTheme]);
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsLangOpen(false);
+        setIsThemeOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const currentLang = (mounted ? LANGUAGE_CONFIG[language] : null) || LANGUAGE_CONFIG.javascript;
   const currentThemeObj = (mounted ? THEMES.find((t) => t.id === theme) : null) || THEMES[0];
   const currentFontSize = mounted ? fontSize : 16;
@@ -39,13 +86,20 @@ export default function EditorTopBar() {
 
   return (
     <>
-      <div className="h-14 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between gap-2 overflow-x-auto">
+      <div
+        ref={containerRef}
+        className="h-14 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between gap-2 relative z-30 overflow-visible"
+      >
         <div className="flex items-center gap-2">
           {/* Language selector */}
           <div className="relative">
             <button
-              onClick={() => setIsLangOpen(!isLangOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-canvas border border-hairline hover:border-hairline-strong text-body-sm font-medium text-ink transition-colors"
+              type="button"
+              onClick={() => {
+                setIsLangOpen(!isLangOpen);
+                setIsThemeOpen(false);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-canvas border border-hairline hover:border-hairline-strong text-body-sm font-medium text-ink transition-colors shadow-level-1"
             >
               <img
                 src={currentLang.logoPath}
@@ -53,14 +107,15 @@ export default function EditorTopBar() {
                 className="w-4 h-4 object-contain"
               />
               <span>{currentLang.label}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-mute ml-1" />
+              <ChevronDown className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isLangOpen ? "rotate-180" : ""}`} />
             </button>
 
             {isLangOpen && (
-              <div className="absolute left-0 top-full mt-1 w-48 py-1 bg-canvas-elevated border border-hairline rounded-lg shadow-level-4 z-50 animate-scale-in max-h-64 overflow-y-auto">
+              <div className="absolute left-0 top-full mt-1.5 w-52 py-1 bg-canvas-elevated border border-hairline rounded-lg shadow-level-4 z-50 animate-scale-in max-h-64 overflow-y-auto">
                 {Object.values(LANGUAGE_CONFIG).map((lang) => (
                   <button
                     key={lang.id}
+                    type="button"
                     onClick={() => {
                       setLanguage(lang.id);
                       setIsLangOpen(false);
@@ -87,22 +142,27 @@ export default function EditorTopBar() {
           {/* Theme selector */}
           <div className="relative">
             <button
-              onClick={() => setIsThemeOpen(!isThemeOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-canvas border border-hairline hover:border-hairline-strong text-body-sm font-medium text-ink transition-colors"
+              type="button"
+              onClick={() => {
+                setIsThemeOpen(!isThemeOpen);
+                setIsLangOpen(false);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-canvas border border-hairline hover:border-hairline-strong text-body-sm font-medium text-ink transition-colors shadow-level-1"
             >
               <span
                 className="w-3 h-3 rounded-full border border-hairline"
                 style={{ backgroundColor: currentThemeObj.color }}
               />
               <span>{currentThemeObj.label}</span>
-              <ChevronDown className="w-3.5 h-3.5 text-mute ml-1" />
+              <ChevronDown className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isThemeOpen ? "rotate-180" : ""}`} />
             </button>
 
             {isThemeOpen && (
-              <div className="absolute left-0 top-full mt-1 w-48 py-1 bg-canvas-elevated border border-hairline rounded-lg shadow-level-4 z-50 animate-scale-in">
+              <div className="absolute left-0 top-full mt-1.5 w-52 py-1 bg-canvas-elevated border border-hairline rounded-lg shadow-level-4 z-50 animate-scale-in">
                 {THEMES.map((t) => (
                   <button
                     key={t.id}
+                    type="button"
                     onClick={() => {
                       setTheme(t.id);
                       setIsThemeOpen(false);
@@ -125,7 +185,7 @@ export default function EditorTopBar() {
             )}
           </div>
 
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-md bg-canvas border border-hairline text-caption text-body">
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-md bg-canvas border border-hairline text-caption text-body shadow-level-1">
             <Sliders className="w-3.5 h-3.5 text-mute" />
             <span>{currentFontSize}px</span>
             <input

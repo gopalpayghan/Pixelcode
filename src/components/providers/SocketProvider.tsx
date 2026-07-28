@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from "@/components/providers/AuthProvider";
 
 interface Position {
   lineNumber: number;
@@ -57,15 +57,13 @@ interface SocketProviderProps {
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const { user } = useUser();
+  const { user } = useAuthContext();
 
   useEffect(() => {
-    // Only initialize socket if we're not in development or if the Socket.IO server is expected to be running
     if (
       process.env.NODE_ENV === "production" ||
       process.env.NEXT_PUBLIC_ENABLE_SOCKETIO === "true"
     ) {
-      // Get the current window location for dynamic port detection
       const socketUrl =
         process.env.NODE_ENV === "production"
           ? process.env.NEXT_PUBLIC_VERCEL_URL
@@ -73,47 +71,34 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
             : "https://your-pixelcode-app.vercel.app"
           : typeof window !== "undefined"
             ? `${window.location.protocol}//${window.location.hostname}:${window.location.port}`
-            : "http://localhost:3000"; // Default to port 3000 for Next.js dev server
+            : "http://localhost:3000";
 
-      console.log("Attempting to connect to Socket.IO server at:", socketUrl);
-
-      // Initialize socket connection
       const socketInstance = io(socketUrl, {
         path: "/api/socketio",
-        transports: ["polling", "websocket"], // Try polling first, then websocket
+        transports: ["polling", "websocket"],
         timeout: 10000,
         forceNew: true,
         autoConnect: true,
       });
 
-      // Connection event handlers
       socketInstance.on("connect", () => {
-        console.log("✅ Connected to Socket.io server");
         setIsConnected(true);
       });
 
       socketInstance.on("disconnect", () => {
-        console.log("❌ Disconnected from Socket.io server");
         setIsConnected(false);
       });
 
       socketInstance.on("connect_error", () => {
-        // Silently handle connection errors in development
-        console.warn(
-          "⚠️ Socket.io connection unavailable - collaborative features disabled"
-        );
         setIsConnected(false);
-        // Don't throw or log error to prevent React error overlay
       });
 
       setSocket(socketInstance);
 
-      // Cleanup on unmount
       return () => {
         socketInstance.close();
       };
     } else {
-      // In development without Socket.IO enabled, just set socket to null
       setSocket(null);
       setIsConnected(false);
     }
@@ -121,17 +106,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const joinRoom = (roomId: string) => {
     if (socket && user) {
-      console.log("Client joining room:", {
-        socketId: socket.id,
-        roomId,
-        userName: user.fullName || user.firstName || "Anonymous",
-      });
       socket.emit("join-room", {
         roomId,
         user: {
-          name: user.fullName || user.firstName || "Anonymous",
-          email: user.primaryEmailAddress?.emailAddress,
-          avatar: user.imageUrl,
+          name: user.name || "Developer",
+          email: user.email,
         },
       });
     }

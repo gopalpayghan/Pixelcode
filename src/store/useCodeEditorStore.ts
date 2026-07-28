@@ -1,6 +1,7 @@
 import { CodeEditorState } from "./../types/index";
 import { create } from "zustand";
 import { Monaco } from "@monaco-editor/react";
+import { LANGUAGE_CONFIG } from "@/lib/constants";
 
 interface User {
   id: string;
@@ -94,7 +95,8 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       stdin: "",
       setStdin: (stdin: string) => set({ stdin }),
       activeOutputTab: "console",
-      setActiveOutputTab: (activeOutputTab: "console" | "stdin") => set({ activeOutputTab }),
+      setActiveOutputTab: (activeOutputTab: "console" | "stdin") =>
+        set({ activeOutputTab }),
 
       // Collaborative state
       isCollaborativeMode: false,
@@ -107,7 +109,9 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
 
       setEditor: (editor: Monaco) => {
         const savedCode = localStorage.getItem(`editor-code-${get().language}`);
-        if (savedCode) editor.setValue(savedCode);
+        const defaultCode =
+          LANGUAGE_CONFIG[get().language]?.defaultCode || "// Hello, World!";
+        editor.setValue(savedCode || defaultCode);
 
         set({ editor });
       },
@@ -122,10 +126,21 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
         set({ fontSize });
       },
 
-      setLanguage: (language: string) => {
-        const currentCode = get().editor?.getValue();
-        if (currentCode) {
-          localStorage.setItem(`editor-code-${get().language}`, currentCode);
+      setLanguage: (language: string, preserveCode = false) => {
+        if (!preserveCode) {
+          const currentCode = get().editor?.getValue();
+          if (currentCode) {
+            localStorage.setItem(`editor-code-${get().language}`, currentCode);
+          }
+
+          const savedCode = localStorage.getItem(`editor-code-${language}`);
+          const defaultCode =
+            LANGUAGE_CONFIG[language]?.defaultCode || "// Hello, World!";
+          const newCode = savedCode || defaultCode;
+
+          if (get().editor) {
+            get().editor.setValue(newCode);
+          }
         }
 
         localStorage.setItem("editor-language", language);
@@ -146,7 +161,12 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
           return;
         }
 
-        set({ isRunning: true, error: null, output: "", activeOutputTab: "console" });
+        set({
+          isRunning: true,
+          error: null,
+          output: "",
+          activeOutputTab: "console",
+        });
 
         try {
           const languageId = JUDGE0_LANGUAGE_MAP[language] || 63;
@@ -163,7 +183,7 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
                 source_code: code,
                 stdin: stdin || "",
               }),
-            }
+            },
           );
 
           const data = await response.json();
@@ -213,34 +233,41 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
                   logs.push(
                     args
                       .map((a) =>
-                        typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                        typeof a === "object"
+                          ? JSON.stringify(a, null, 2)
+                          : String(a),
                       )
-                      .join(" ")
+                      .join(" "),
                   ),
                 error: (...args: unknown[]) =>
                   logs.push(
                     "Error: " +
                       args
                         .map((a) =>
-                          typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                          typeof a === "object"
+                            ? JSON.stringify(a, null, 2)
+                            : String(a),
                         )
-                        .join(" ")
+                        .join(" "),
                   ),
                 warn: (...args: unknown[]) =>
                   logs.push(
                     "Warning: " +
                       args
                         .map((a) =>
-                          typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)
+                          typeof a === "object"
+                            ? JSON.stringify(a, null, 2)
+                            : String(a),
                         )
-                        .join(" ")
+                        .join(" "),
                   ),
               };
 
               const runFn = new Function("console", "stdin", code);
               runFn(customConsole, stdin);
 
-              const clientOutput = logs.join("\n") || "Program executed successfully.";
+              const clientOutput =
+                logs.join("\n") || "Program executed successfully.";
               set({
                 output: clientOutput,
                 error: null,
@@ -249,7 +276,9 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
               return;
             } catch (jsError: unknown) {
               const errMsg =
-                jsError instanceof Error ? jsError.message : "Error running code";
+                jsError instanceof Error
+                  ? jsError.message
+                  : "Error running code";
               set({
                 error: errMsg,
                 executionResult: { code, output: "", error: errMsg },
@@ -264,7 +293,8 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
             executionResult: {
               code,
               output: "",
-              error: "Error running code. Please check your internet connection.",
+              error:
+                "Error running code. Please check your internet connection.",
             },
           });
         } finally {
@@ -288,7 +318,7 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       addUser: (user: User) => {
         const { activeUsers } = get();
         const existingUserIndex = activeUsers.findIndex(
-          (u) => u.id === user.id
+          (u) => u.id === user.id,
         );
 
         if (existingUserIndex >= 0) {
@@ -349,7 +379,7 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
         }
       },
     };
-  }
+  },
 );
 
 export const getExecutionResult = () =>

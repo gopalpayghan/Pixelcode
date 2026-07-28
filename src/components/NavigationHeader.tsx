@@ -1,6 +1,15 @@
 "use client";
 
-import { Code2, Sparkles, Users, BookOpen, Menu, X, LogOut, User as UserIcon } from "lucide-react";
+import {
+  Code2,
+  Sparkles,
+  Users,
+  BookOpen,
+  Menu,
+  X,
+  LogOut,
+  User as UserIcon,
+} from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
@@ -50,7 +59,8 @@ function NavigationHeader() {
           {/* ─── Desktop Nav Links (center) ─── */}
           <div className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map((link) => {
-              const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
+              const isActive =
+                pathname === link.href || pathname?.startsWith(link.href + "/");
               return (
                 <Link
                   key={link.href}
@@ -81,7 +91,10 @@ function NavigationHeader() {
               <>
                 <Link href="/pricing" prefetch={true}>
                   <Button variant="ghost" size="sm">
-                    <Sparkles className="w-3.5 h-3.5 text-warning" aria-hidden="true" />
+                    <Sparkles
+                      className="w-3.5 h-3.5 text-warning"
+                      aria-hidden="true"
+                    />
                     Pro
                   </Button>
                 </Link>
@@ -115,7 +128,9 @@ function NavigationHeader() {
                 {userDropdownOpen && (
                   <div className="absolute right-0 top-full mt-2 w-48 py-1 bg-canvas-elevated border border-hairline rounded-lg shadow-level-4 z-50 animate-scale-in">
                     <div className="px-3 py-2 border-b border-hairline text-caption">
-                      <p className="font-medium text-ink truncate">{user.name}</p>
+                      <p className="font-medium text-ink truncate">
+                        {user.name}
+                      </p>
                       <p className="text-mute truncate">{user.email}</p>
                     </div>
 
@@ -193,12 +208,18 @@ function NavigationHeader() {
             <div className="mt-4 pt-4 border-t border-hairline flex flex-col gap-2">
               {!user ? (
                 <>
-                  <Link href="/sign-in" onClick={() => setMobileMenuOpen(false)}>
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <Button variant="secondary" size="md" className="w-full">
                       Log In
                     </Button>
                   </Link>
-                  <Link href="/sign-up" onClick={() => setMobileMenuOpen(false)}>
+                  <Link
+                    href="/sign-up"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
                     <Button variant="primary" size="md" className="w-full">
                       Sign Up
                     </Button>
@@ -210,7 +231,9 @@ function NavigationHeader() {
                     <div className="w-7 h-7 rounded-full bg-link/10 text-link font-semibold text-caption flex items-center justify-center">
                       {user.name.charAt(0)}
                     </div>
-                    <span className="text-body-sm font-medium text-ink">{user.name}</span>
+                    <span className="text-body-sm font-medium text-ink">
+                      {user.name}
+                    </span>
                   </div>
                   <Button
                     variant="ghost"

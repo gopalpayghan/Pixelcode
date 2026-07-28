@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
@@ -10,8 +10,9 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 import { ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 
-export default function CustomSignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signIn } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,7 +27,10 @@ export default function CustomSignInPage() {
     setLoading(false);
 
     if (success) {
-      router.push("/editor");
+      // Redirect to the original page the user was trying to access,
+      // or fall back to /editor
+      const redirectTo = searchParams?.get("redirect") || "/editor";
+      router.push(redirectTo);
     }
   };
 
@@ -112,5 +116,19 @@ export default function CustomSignInPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CustomSignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen bg-canvas">
+          <div className="w-8 h-8 border-2 border-hairline border-t-ink rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

@@ -6,25 +6,57 @@ import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Users, Plus, ArrowRight, Code2, Zap, Shield, Sparkles } from "lucide-react";
+import {
+  Users,
+  Plus,
+  ArrowRight,
+  Code2,
+  Zap,
+  Shield,
+  Sparkles,
+} from "lucide-react";
 import toast from "react-hot-toast";
+import { useAuthContext } from "@/components/providers/AuthProvider";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export default function CollaborateLandingPage() {
   const router = useRouter();
+  const { user } = useAuthContext();
   const [joinRoomId, setJoinRoomId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const createSessionMut = useMutation(api.collaborativeSessions.createSession);
 
   const generateRoomId = () => {
     return "room-" + Math.random().toString(36).substring(2, 9);
   };
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
+    if (!user) {
+      toast.error("Please sign in to create a room");
+      router.push("/sign-in?redirect=/collaborate");
+      return;
+    }
+
     setIsCreating(true);
     const newRoomId = generateRoomId();
-    toast.success("Room created! Redirecting...");
-    setTimeout(() => {
+
+    try {
+      await createSessionMut({
+        roomId: newRoomId,
+        title: `Room ${newRoomId}`,
+        language: "javascript",
+        code: "// Write code here...\n",
+        hostUserId: user.userId,
+        hostUserName: user.name || "Anonymous Developer",
+      });
+
+      toast.success("Room created as Admin! Redirecting...");
       router.push(`/collaborate/${newRoomId}`);
-    }, 500);
+    } catch {
+      toast.error("Failed to create room session");
+      setIsCreating(false);
+    }
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
@@ -60,14 +92,21 @@ export default function CollaborateLandingPage() {
           {/* Actions grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {/* Create Room Card */}
-            <Card variant="default" hover className="flex flex-col justify-between">
+            <Card
+              variant="default"
+              hover
+              className="flex flex-col justify-between"
+            >
               <div>
                 <div className="w-10 h-10 rounded-lg bg-link/10 text-link flex items-center justify-center mb-4">
                   <Plus className="w-5 h-5" />
                 </div>
-                <h2 className="text-display-sm text-ink mb-2">Create a New Room</h2>
+                <h2 className="text-display-sm text-ink mb-2">
+                  Create a New Room
+                </h2>
                 <p className="text-body-sm text-body">
-                  Start an instant collaborative coding session. Invite anyone by sharing your unique room link.
+                  Start an instant collaborative coding session. Invite anyone
+                  by sharing your unique room link.
                 </p>
               </div>
               <div className="mt-8">
@@ -85,14 +124,21 @@ export default function CollaborateLandingPage() {
             </Card>
 
             {/* Join Room Card */}
-            <Card variant="default" hover className="flex flex-col justify-between">
+            <Card
+              variant="default"
+              hover
+              className="flex flex-col justify-between"
+            >
               <div>
                 <div className="w-10 h-10 rounded-lg bg-canvas-soft-2 text-ink flex items-center justify-center mb-4 border border-hairline">
                   <Users className="w-5 h-5" />
                 </div>
-                <h2 className="text-display-sm text-ink mb-2">Join Existing Room</h2>
+                <h2 className="text-display-sm text-ink mb-2">
+                  Join Existing Room
+                </h2>
                 <p className="text-body-sm text-body mb-4">
-                  Have a room code from a colleague? Enter it below to join their live session immediately.
+                  Have a room code from a colleague? Enter it below to join
+                  their live session immediately.
                 </p>
               </div>
               <form onSubmit={handleJoinRoom} className="space-y-3">
@@ -121,24 +167,36 @@ export default function CollaborateLandingPage() {
             <div className="flex items-start gap-3">
               <Zap className="w-4 h-4 text-link shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-body-sm font-semibold text-ink">Zero Latency Sync</h3>
-                <p className="text-caption text-mute mt-0.5">Instant WebSocket code & cursor transmission.</p>
+                <h3 className="text-body-sm font-semibold text-ink">
+                  Zero Latency Sync
+                </h3>
+                <p className="text-caption text-mute mt-0.5">
+                  Instant WebSocket code & cursor transmission.
+                </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
               <Code2 className="w-4 h-4 text-link shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-body-sm font-semibold text-ink">10+ Languages</h3>
-                <p className="text-caption text-mute mt-0.5">Full multi-language execution in rooms.</p>
+                <h3 className="text-body-sm font-semibold text-ink">
+                  10+ Languages
+                </h3>
+                <p className="text-caption text-mute mt-0.5">
+                  Full multi-language execution in rooms.
+                </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
               <Shield className="w-4 h-4 text-link shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-body-sm font-semibold text-ink">Private Rooms</h3>
-                <p className="text-caption text-mute mt-0.5">Only people with the link can join.</p>
+                <h3 className="text-body-sm font-semibold text-ink">
+                  Private Rooms
+                </h3>
+                <p className="text-caption text-mute mt-0.5">
+                  Only people with the link can join.
+                </p>
               </div>
             </div>
           </div>

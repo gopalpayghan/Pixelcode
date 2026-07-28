@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import ConvexClientProvider from "@/components/providers/ConvexClientProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { SocketProvider } from "@/components/providers/SocketProvider";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = localFont({
@@ -54,7 +55,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            <SocketProvider>{children}</SocketProvider>
+          </ConvexClientProvider>
         </AuthProvider>
 
         <Toaster

@@ -32,6 +32,9 @@ export default function ThemeToggle() {
       document.documentElement.classList.add("dark");
       document.documentElement.classList.remove("light");
     }
+
+    // Broadcast theme change event for Monaco sync
+    window.dispatchEvent(new CustomEvent("pixelcode-theme-change", { detail: nextTheme }));
   };
 
   if (!mounted) {

@@ -58,4 +58,35 @@ export default defineSchema({
   })
     .index("by_room_id", ["roomId"])
     .index("by_host_user_id", ["hostUserId"]),
+
+  roomParticipants: defineTable({
+    roomId: v.string(),
+    userId: v.string(),
+    userName: v.string(),
+    avatar: v.optional(v.string()),
+    lastSeen: v.number(),
+    cursorLine: v.optional(v.number()),
+    cursorColumn: v.optional(v.number()),
+  })
+    .index("by_room_id", ["roomId"])
+    .index("by_room_and_user", ["roomId", "userId"]),
+
+  changeRequests: defineTable({
+    roomId: v.string(),
+    authorUserId: v.string(),
+    authorUserName: v.string(),
+    description: v.string(),
+    originalCode: v.string(),
+    proposedCode: v.string(),
+    language: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+    ),
+    reviewedBy: v.optional(v.string()),
+    reviewedAt: v.optional(v.number()),
+  })
+    .index("by_room_id", ["roomId"])
+    .index("by_room_and_status", ["roomId", "status"]),
 });

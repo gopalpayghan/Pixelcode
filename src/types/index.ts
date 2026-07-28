@@ -49,7 +49,7 @@ export interface CodeEditorState {
 
   setEditor: (editor: Monaco) => void;
   getCode: () => string;
-  setLanguage: (language: string) => void;
+  setLanguage: (language: string, preserveCode?: boolean) => void;
   setTheme: (theme: string) => void;
   setFontSize: (fontSize: number) => void;
   runCode: () => Promise<void>;

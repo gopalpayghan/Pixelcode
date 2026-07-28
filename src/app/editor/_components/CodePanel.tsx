@@ -19,8 +19,10 @@ const Editor = dynamic(() => import("@monaco-editor/react"), {
 
 export default function CodePanel() {
   const mounted = useMounted();
-  const { language, theme, fontSize, setEditor, runCode } = useCodeEditorStore();
-  const currentLang = (mounted ? LANGUAGE_CONFIG[language] : null) || LANGUAGE_CONFIG.javascript;
+  const { language, theme, fontSize, setEditor, runCode } =
+    useCodeEditorStore();
+  const currentLang =
+    (mounted ? LANGUAGE_CONFIG[language] : null) || LANGUAGE_CONFIG.javascript;
 
   const handleEditorMount: OnMount = (editor, monaco: Monaco) => {
     defineMonacoThemes(monaco);
