@@ -3,7 +3,7 @@
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, THEMES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
-import { Play, Share2, Terminal, Sliders, Check, ChevronDown, Users2, Loader2, Download, Timer } from "lucide-react";
+import { Play, Share2, Sliders, Check, ChevronDown, Users2, Loader2, Download, Timer } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
@@ -28,9 +28,6 @@ export default function EditorTopBar() {
     setFontSize,
     runCode,
     isRunning,
-    stdin,
-    activeOutputTab,
-    setActiveOutputTab,
     getCode,
   } = useCodeEditorStore();
 
@@ -188,7 +185,7 @@ export default function EditorTopBar() {
     <>
       <div
         ref={containerRef}
-        className="h-14 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between gap-2 relative z-30 overflow-visible"
+        className="min-h-[3.5rem] px-4 bg-canvas-soft border-b border-hairline flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 relative z-40 overflow-visible shrink-0"
       >
         <div className="flex items-center gap-2">
           {/* Language selector */}
@@ -358,16 +355,6 @@ export default function EditorTopBar() {
             title="Download code file"
           >
             Export
-          </Button>
-
-          <Button
-            variant={activeOutputTab === "stdin" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setActiveOutputTab(activeOutputTab === "stdin" ? "console" : "stdin")}
-            icon={<Terminal className="w-3.5 h-3.5" />}
-            className={activeOutputTab === "stdin" || stdin ? "border-link text-link" : ""}
-          >
-            STDIN {stdin ? "(Active)" : ""}
           </Button>
 
           <Button

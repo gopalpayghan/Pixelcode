@@ -36,6 +36,10 @@ export default function ResizableEditorLayout({
     setIsDragging(true);
   }, []);
 
+  const handleTouchStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (!isDragging || !containerRef.current) return;
@@ -45,11 +49,36 @@ export default function ResizableEditorLayout({
       if (isMobile) {
         // Vertical split on mobile
         const newTop = ((e.clientY - rect.top) / rect.height) * 100;
-        const clampedTop = Math.min(Math.max(newTop, 30), 80);
+        const clampedTop = Math.min(Math.max(newTop, 25), 85);
         setLeftPercent(clampedTop);
       } else {
         // Horizontal split on desktop
         const newLeft = ((e.clientX - rect.left) / rect.width) * 100;
+        const clampedLeft = Math.min(
+          Math.max(newLeft, minLeftPercent),
+          maxLeftPercent
+        );
+        setLeftPercent(clampedLeft);
+      }
+
+      handleLayoutResize();
+    },
+    [isDragging, minLeftPercent, maxLeftPercent, handleLayoutResize]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!isDragging || !containerRef.current || !e.touches[0]) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const touch = e.touches[0];
+      const isMobile = window.innerWidth < 1024;
+
+      if (isMobile) {
+        const newTop = ((touch.clientY - rect.top) / rect.height) * 100;
+        const clampedTop = Math.min(Math.max(newTop, 25), 85);
+        setLeftPercent(clampedTop);
+      } else {
+        const newLeft = ((touch.clientX - rect.left) / rect.width) * 100;
         const clampedLeft = Math.min(
           Math.max(newLeft, minLeftPercent),
           maxLeftPercent
@@ -73,11 +102,15 @@ export default function ResizableEditorLayout({
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("touchmove", handleTouchMove);
+      window.addEventListener("touchend", handleMouseUp);
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     } else {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleMouseUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     }
@@ -85,10 +118,12 @@ export default function ResizableEditorLayout({
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleMouseUp);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove]);
 
   return (
     <div
@@ -110,6 +145,7 @@ export default function ResizableEditorLayout({
       {/* Resizable Divider Handle Bar */}
       <div
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         className={`relative z-20 flex items-center justify-center shrink-0 transition-colors
           lg:w-2 lg:h-full lg:cursor-col-resize w-full h-2 cursor-row-resize
           bg-hairline/60 hover:bg-link/50 active:bg-link group ${

@@ -36,7 +36,7 @@ export default function CodePanel() {
   return (
     <div className="flex flex-col h-full bg-canvas">
       <div className="h-9 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between text-caption">
-        <div className="flex items-center gap-2 px-3 py-1 bg-canvas border-t-2 border-link border-x border-hairline text-ink font-mono rounded-t-sm">
+        <div className="flex items-center gap-2 px-3 py-1 bg-canvas border-t-2 border-t-link border-x border-hairline text-ink font-mono rounded-t-sm">
           <FileCode className="w-3.5 h-3.5 text-link" />
           <span>{currentLang.fileName}</span>
         </div>

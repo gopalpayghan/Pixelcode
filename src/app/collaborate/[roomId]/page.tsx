@@ -520,7 +520,7 @@ function CollaborativeRoomContent({
       <NavigationHeader />
 
       {/* Room toolbar */}
-      <div className="h-12 px-4 bg-canvas-soft-2 border-b border-hairline flex items-center justify-between text-body-sm">
+      <div className="min-h-[3rem] px-4 bg-canvas-soft-2 border-b border-hairline flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 text-body-sm relative z-40 overflow-visible shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Circle className="w-2.5 h-2.5 fill-success text-success animate-pulse" />
