@@ -115,7 +115,7 @@ export const THEMES: Theme[] = [
 import { registerMonacoLanguageCompletions } from "./monacoCompletions";
 
 export function defineMonacoThemes(monaco: typeof import("monaco-editor")) {
-  registerMonacoLanguageCompletions(monaco as any);
+  registerMonacoLanguageCompletions(monaco as unknown as Parameters<typeof registerMonacoLanguageCompletions>[0]);
 
   monaco.editor.defineTheme("github-dark", {
     base: "vs-dark",

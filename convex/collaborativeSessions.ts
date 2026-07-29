@@ -72,14 +72,15 @@ export const endSession = mutation({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db
+    const sessions = await ctx.db
       .query("collaborativeSessions")
       .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
-      .first();
+      .collect();
 
-    if (!session) return;
+    if (sessions.length === 0) return;
 
-    if (session.hostUserId !== args.userId) {
+    const isHost = sessions.some((s) => s.hostUserId === args.userId);
+    if (!isHost) {
       throw new ConvexError("Only the session host can end the room");
     }
 
@@ -103,8 +104,10 @@ export const endSession = mutation({
       await ctx.db.delete(r._id);
     }
 
-    // 3. Permanently delete the collaborativeSessions room document
-    await ctx.db.delete(session._id);
+    // 3. Delete ALL collaborativeSessions records for this room
+    for (const s of sessions) {
+      await ctx.db.delete(s._id);
+    }
   },
 });
 
@@ -114,18 +117,19 @@ export const deleteSession = mutation({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db
+    const sessions = await ctx.db
       .query("collaborativeSessions")
       .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
-      .first();
+      .collect();
 
-    if (!session) return;
+    if (sessions.length === 0) return;
 
-    if (session.hostUserId !== args.userId) {
+    const isHost = sessions.some((s) => s.hostUserId === args.userId);
+    if (!isHost) {
       throw new ConvexError("Only the session host can delete the room");
     }
 
-    // Delete all participants for this room
+    // 1. Delete all roomParticipants for this room
     const participants = await ctx.db
       .query("roomParticipants")
       .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
@@ -135,7 +139,7 @@ export const deleteSession = mutation({
       await ctx.db.delete(p._id);
     }
 
-    // Delete all change requests for this room
+    // 2. Delete all changeRequests for this room
     const requests = await ctx.db
       .query("changeRequests")
       .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
@@ -145,8 +149,10 @@ export const deleteSession = mutation({
       await ctx.db.delete(r._id);
     }
 
-    // Delete the session document itself
-    await ctx.db.delete(session._id);
+    // 3. Delete ALL collaborativeSessions records for this room
+    for (const s of sessions) {
+      await ctx.db.delete(s._id);
+    }
   },
 });
 

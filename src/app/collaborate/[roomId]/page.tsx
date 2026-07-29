@@ -46,16 +46,11 @@ import {
   Loader2,
   Lock,
   Unlock,
-  Download,
-  FolderPlus,
-  Timer as TimerIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
 import RoomChatPanel, { ChatMessage } from "@/app/collaborate/_components/RoomChatPanel";
-import VoiceChatControls from "@/app/collaborate/_components/VoiceChatControls";
 import SaveSnippetModal from "@/app/collaborate/_components/SaveSnippetModal";
-import { LANGUAGE_CONFIG } from "@/lib/constants";
 import {
   playRoomCreatedSound,
   playRoomDeletedSound,
@@ -157,9 +152,6 @@ function CollaborativeRoomContent({
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [followedUserName, setFollowedUserName] = useState<string | null>(null);
-  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
-  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showSaveSnippetModal, setShowSaveSnippetModal] = useState(false);
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
   const [pendingTargetUrl, setPendingTargetUrl] = useState<string | null>(null);
@@ -210,26 +202,7 @@ function CollaborativeRoomContent({
     };
   }, []);
 
-  // Timer Countdown Ticker
-  useEffect(() => {
-    if (!timerEndTime) {
-      setTimerRemainingSeconds(null);
-      return;
-    }
 
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
-      setTimerRemainingSeconds(remaining);
-
-      if (remaining === 0) {
-        setTimerEndTime(null);
-        playRoomCreatedSound();
-        toast("⏱️ Time's up! Room session timer completed.", { icon: "🎉" });
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timerEndTime]);
 
   // ─── Liveblocks Event Listener ───
   useEventListener(({ event }: { event: RoomEvent }) => {
@@ -278,75 +251,8 @@ function CollaborativeRoomContent({
       setTimeout(() => {
         isReceivingRemoteOutput.current = false;
       }, 100);
-    } else if (event.type === "TIMER_UPDATED") {
-      setTimerEndTime(event.timerEndTime);
-      if (event.isTimerRunning && event.durationMinutes > 0) {
-        toast(`Timer set to ${event.durationMinutes}m by Admin`, { icon: "⏱️" });
-      }
     }
   });
-
-  const handleStartTimer = (durationMinutes: number) => {
-    const endTime = Date.now() + durationMinutes * 60 * 1000;
-    setTimerEndTime(endTime);
-    setShowTimerMenu(false);
-    broadcast({
-      type: "TIMER_UPDATED",
-      timerEndTime: endTime,
-      durationMinutes,
-      isTimerRunning: true,
-    });
-    toast.success(`Started ${durationMinutes}m challenge timer!`);
-  };
-
-  const handleStopTimer = () => {
-    setTimerEndTime(null);
-    setShowTimerMenu(false);
-    broadcast({
-      type: "TIMER_UPDATED",
-      timerEndTime: null,
-      durationMinutes: 0,
-      isTimerRunning: false,
-    });
-    toast("Timer stopped", { icon: "⏱️" });
-  };
-
-  const handleExportCode = () => {
-    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
-    if (!editorCode.trim()) {
-      toast.error("Code editor is empty");
-      return;
-    }
-
-    const currentLangConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.javascript;
-    const blob = new Blob([editorCode], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `pixelcode-${roomId}${currentLangConfig.fileExtension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    playChatMessageSound();
-    toast.success(`Exported code as ${currentLangConfig.fileName}`);
-  };
-
-  const handleSaveToSnippets = () => {
-    if (!user) {
-      toast.error("Please sign in to save snippets");
-      return;
-    }
-
-    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
-    if (!editorCode.trim()) {
-      toast.error("Code editor is empty");
-      return;
-    }
-
-    setShowSaveSnippetModal(true);
-  };
 
   const handleSaveToSnippetsConfirmed = async (title: string, isPublic: boolean) => {
     if (!user) {
@@ -532,6 +438,9 @@ function CollaborativeRoomContent({
     if (isAdmin) {
       try {
         await deleteSessionMut({ roomId, userId: user.userId });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem(`pixelcode_room_code_${roomId}`);
+        }
         playRoomDeletedSound();
         toast.success("Room session ended & deleted");
       } catch {
@@ -742,7 +651,7 @@ function CollaborativeRoomContent({
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-body font-semibold text-ink">
+                <h3 className="text-body-md font-semibold text-ink">
                   {isAdmin ? "End & Delete Room Session?" : "Leave Room Session?"}
                 </h3>
                 <p className="text-caption text-mute mt-0.5">
