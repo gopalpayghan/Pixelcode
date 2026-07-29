@@ -3,7 +3,7 @@
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, THEMES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
-import { Play, Share2, Terminal, Sliders, Check, ChevronDown, Users2, Loader2 } from "lucide-react";
+import { Play, Share2, Terminal, Sliders, Check, ChevronDown, Users2, Loader2, Download, Timer } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
@@ -12,6 +12,7 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 import toast from "react-hot-toast";
 import useMounted from "@/hooks/useMounted";
 import ShareSnippetModal from "./ShareSnippetModal";
+import { playChatMessageSound, playRoomCreatedSound } from "@/lib/soundEffects";
 
 export default function EditorTopBar() {
   const mounted = useMounted();
@@ -38,7 +39,68 @@ export default function EditorTopBar() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
+  // Timer & Export State
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const [showTimerMenu, setShowTimerMenu] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Timer Countdown Ticker Effect
+  useEffect(() => {
+    if (!timerEndTime) {
+      setTimerRemainingSeconds(null);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
+      setTimerRemainingSeconds(remaining);
+
+      if (remaining === 0) {
+        setTimerEndTime(null);
+        playRoomCreatedSound();
+        toast("⏱️ Time's up! Solo coding challenge timer completed.", { icon: "🎉" });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timerEndTime]);
+
+  const handleStartTimer = (durationMinutes: number) => {
+    const endTime = Date.now() + durationMinutes * 60 * 1000;
+    setTimerEndTime(endTime);
+    setShowTimerMenu(false);
+    toast.success(`Started ${durationMinutes}m solo challenge timer!`);
+  };
+
+  const handleStopTimer = () => {
+    setTimerEndTime(null);
+    setShowTimerMenu(false);
+    toast("Timer stopped", { icon: "⏱️" });
+  };
+
+  const handleExportCode = () => {
+    const editorCode = getCode() || "";
+    if (!editorCode.trim()) {
+      toast.error("Code editor is empty");
+      return;
+    }
+
+    const currentLangConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.javascript;
+    const blob = new Blob([editorCode], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pixelcode-${currentLangConfig.fileName}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    playChatMessageSound();
+    toast.success(`Exported code as ${currentLangConfig.fileName}`);
+  };
 
   // Sync editor theme with main website theme (light / dark)
   useEffect(() => {
@@ -238,6 +300,66 @@ export default function EditorTopBar() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Active Timer Countdown Badge */}
+          {timerRemainingSeconds !== null && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-link/15 border border-link/30 text-link font-mono font-bold text-xs animate-pulse">
+              <Timer className="w-3.5 h-3.5" />
+              <span>
+                {Math.floor(timerRemainingSeconds / 60)}:
+                {String(timerRemainingSeconds % 60).padStart(2, "0")}
+              </span>
+            </div>
+          )}
+
+          {/* Timer Sprint Menu Dropdown */}
+          <div className="relative">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowTimerMenu((prev) => !prev)}
+              icon={<Timer className="w-3.5 h-3.5" />}
+              title="Set a solo practice challenge timer"
+            >
+              Timer
+            </Button>
+
+            {showTimerMenu && (
+              <div className="absolute top-full right-0 mt-1.5 z-50 w-44 bg-canvas-dark border border-hairline/80 rounded-xl shadow-2xl backdrop-blur-xl p-1.5 flex flex-col gap-1 text-xs">
+                <span className="px-2 py-1 font-semibold text-mute text-[10px] uppercase tracking-wider">
+                  Start Challenge Timer
+                </span>
+                {[15, 30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => handleStartTimer(mins)}
+                    className="px-2.5 py-1.5 rounded-md text-left hover:bg-canvas-soft-2 text-ink transition-colors font-medium"
+                  >
+                    {mins} Minutes Sprint
+                  </button>
+                ))}
+                {timerRemainingSeconds !== null && (
+                  <button
+                    onClick={handleStopTimer}
+                    className="px-2.5 py-1.5 rounded-md text-left hover:bg-error/15 text-error transition-colors font-medium border-t border-hairline/50 mt-1"
+                  >
+                    Stop Timer
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 1-Click Code File Export */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportCode}
+            icon={<Download className="w-3.5 h-3.5" />}
+            title="Download code file"
+          >
+            Export
+          </Button>
+
           <Button
             variant={activeOutputTab === "stdin" ? "secondary" : "ghost"}
             size="sm"
