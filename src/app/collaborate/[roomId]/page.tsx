@@ -1,82 +1,91 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { ClientSideSuspense } from "@liveblocks/react";
 import NavigationHeader from "@/components/NavigationHeader";
 import EditorTopBar from "@/app/editor/_components/EditorTopBar";
-import CodePanel from "@/app/editor/_components/CodePanel";
 import OutputPanel from "@/app/editor/_components/OutputPanel";
 import StatusBar from "@/app/editor/_components/StatusBar";
-import ChangeRequestPanel from "@/app/collaborate/_components/ChangeRequestPanel";
-import SubmitChangesModal from "@/app/collaborate/_components/SubmitChangesModal";
-import SideBySideDiff from "@/app/collaborate/_components/SideBySideDiff";
+import dynamic from "next/dynamic";
+import LiveAvatars from "@/app/collaborate/_components/LiveAvatars";
+import ResizableEditorLayout from "@/components/ResizableEditorLayout";
+
+const CollaborativeCodeEditor = dynamic(
+  () => import("@/app/collaborate/_components/CollaborativeCodeEditor"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-full bg-canvas text-caption text-mute font-mono">
+        <div className="w-4 h-4 border-2 border-hairline border-t-link rounded-full animate-spin mr-2" />
+        Loading Collaborative Editor...
+      </div>
+    ),
+  }
+);
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
-import { useSocket } from "@/components/providers/SocketProvider";
-import { LANGUAGE_CONFIG } from "@/lib/constants";
 import {
-  Users,
+  RoomProvider,
+  useBroadcastEvent,
+  useEventListener,
+  useSelf,
+  RoomEvent,
+} from "../../../../liveblocks.config";
+import {
   Copy,
   Check,
+  MessageSquare,
   LogOut,
   Circle,
-  GitPullRequest,
   Shield,
-  Send,
   Code2,
   Trash2,
-  FileCode,
-  Columns,
-  Split,
+  Loader2,
+  Lock,
+  Unlock,
+  Download,
+  FolderPlus,
+  Timer as TimerIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
+import RoomChatPanel, { ChatMessage } from "@/app/collaborate/_components/RoomChatPanel";
+import VoiceChatControls from "@/app/collaborate/_components/VoiceChatControls";
+import SaveSnippetModal from "@/app/collaborate/_components/SaveSnippetModal";
+import { LANGUAGE_CONFIG } from "@/lib/constants";
+import {
+  playRoomCreatedSound,
+  playRoomDeletedSound,
+  playChatMessageSound,
+  playUserJoinedSound,
+} from "@/lib/soundEffects";
 
-export default function CollaborativeRoomPage() {
-  const params = useParams();
+// ─── Inner room content (must be inside RoomProvider) ───
+function CollaborativeRoomContent({
+  roomId,
+}: {
+  roomId: string;
+}) {
   const router = useRouter();
-  const roomId = params?.roomId as string;
   const { user } = useAuthContext();
-  const { socket, isConnected } = useSocket();
 
   const [copied, setCopied] = useState(false);
-  const [isReviewPanelOpen, setIsReviewPanelOpen] = useState(false);
-  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [contributorViewMode, setContributorViewMode] = useState<
-    "split" | "diff"
-  >("split");
-  const [draftCode, setDraftCode] = useState("");
-  const { editor, setLanguage, runCode, language } = useCodeEditorStore();
-
-  const isRemoteUpdatingRef = useRef(false);
+  const { language, runCode, setLanguage } = useCodeEditorStore();
 
   // ─── Convex queries & mutations ───
   const joinSessionMut = useMutation(api.collaborativeSessions.joinSession);
-  const leaveSessionMut = useMutation(api.collaborativeSessions.leaveSession);
-  const heartbeatMut = useMutation(api.collaborativeSessions.heartbeat);
   const createSessionMut = useMutation(api.collaborativeSessions.createSession);
+  const updateSessionCodeMut = useMutation(api.collaborativeSessions.updateSessionCode);
   const deleteSessionMut = useMutation(api.collaborativeSessions.deleteSession);
-  const updateSessionCodeMut = useMutation(
-    api.collaborativeSessions.updateSessionCode,
-  );
-  const updateCursorPositionMut = useMutation(
-    api.collaborativeSessions.updateCursorPosition,
-  );
-
-  const participants = useQuery(
-    api.collaborativeSessions.getActiveParticipants,
-    roomId ? { roomId } : "skip",
-  );
+  const heartbeatMut = useMutation(api.collaborativeSessions.heartbeat);
+  const createSnippetMut = useMutation(api.snippets.createSnippet);
+  const leaveSessionMut = useMutation(api.collaborativeSessions.leaveSession);
 
   const roomAdmin = useQuery(
     api.collaborativeSessions.getRoomAdmin,
-    roomId ? { roomId } : "skip",
-  );
-
-  const changeRequests = useQuery(
-    api.collaborativeSessions.getChangeRequests,
     roomId ? { roomId } : "skip",
   );
 
@@ -86,38 +95,27 @@ export default function CollaborativeRoomPage() {
   );
 
   const isAdmin = !!(user && roomAdmin && roomAdmin.hostUserId === user.userId);
-  const pendingCount =
-    changeRequests?.filter((cr) => cr.status === "pending").length ?? 0;
 
   // ─── Create session if first user (becomes admin) ───
   useEffect(() => {
-    // roomAdmin is undefined while loading, null if no session exists
     if (!roomId || !user || roomAdmin === undefined) return;
 
-    // Only create if no session exists yet
     if (roomAdmin === null) {
       createSessionMut({
         roomId,
         title: `Room ${roomId}`,
         language: language || "javascript",
-        code: editor?.getValue() || "// Start coding here...\n",
+        code: "",
         hostUserId: user.userId,
         hostUserName: user.name || "Anonymous Developer",
       }).catch(() => {
-        // Session might already exist from another tab, ignore
+        // Session might already exist from another tab
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user?.userId, roomAdmin]);
 
-  // ─── Initialize draft code for contributors ───
-  useEffect(() => {
-    if (!isAdmin && session?.code && !draftCode) {
-      setDraftCode(session.code);
-    }
-  }, [isAdmin, session?.code, draftCode]);
-
-  // ─── Participant tracking ───
+  // ─── Participant tracking (Convex-based, kept for persistence) ───
   useEffect(() => {
     if (!roomId || !user) return;
 
@@ -137,6 +135,7 @@ export default function CollaborativeRoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user?.userId]);
 
+  // ─── Heartbeat ───
   useEffect(() => {
     if (!roomId || !user) return;
 
@@ -151,128 +150,334 @@ export default function CollaborativeRoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, user?.userId]);
 
-  // ─── Socket.IO code sync (when available, admin only) ───
+  const broadcast = useBroadcastEvent();
+  const self = useSelf();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLocked, setIsLocked] = useState(false);
+  const [followedUserName, setFollowedUserName] = useState<string | null>(null);
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const [showTimerMenu, setShowTimerMenu] = useState(false);
+  const [showSaveSnippetModal, setShowSaveSnippetModal] = useState(false);
+
+  const isReceivingRemoteOutput = useRef(false);
+
+  // Timer Countdown Ticker
   useEffect(() => {
-    if (!socket || !isConnected || !roomId || !user) return;
+    if (!timerEndTime) {
+      setTimerRemainingSeconds(null);
+      return;
+    }
 
-    socket.emit("join-room", {
-      roomId,
-      user: {
-        id: user.userId,
-        name: user.name || "Anonymous",
-        avatar: user.avatar,
-      },
-    });
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
+      setTimerRemainingSeconds(remaining);
 
-    socket.on("code-update", (data: { code: string; language: string }) => {
-      if (editor && isAdmin) {
-        const currentCode = editor.getValue();
-        if (currentCode !== data.code) {
-          isRemoteUpdatingRef.current = true;
-          const pos = editor.getPosition();
-          editor.setValue(data.code);
-          if (pos) editor.setPosition(pos);
-          isRemoteUpdatingRef.current = false;
-        }
+      if (remaining === 0) {
+        setTimerEndTime(null);
+        playRoomCreatedSound();
+        toast("⏱️ Time's up! Room session timer completed.", { icon: "🎉" });
       }
-    });
+    }, 1000);
 
-    socket.on("language-update", (data: { language: string }) => {
-      setLanguage(data.language);
-    });
+    return () => clearInterval(interval);
+  }, [timerEndTime]);
 
-    socket.on("code-execution", () => {
-      toast("Partner ran the code!", { icon: "⚡" });
+  // ─── Liveblocks Event Listener ───
+  useEventListener(({ event }: { event: RoomEvent }) => {
+    if (event.type === "USER_JOINED") {
+      playUserJoinedSound();
+      toast(`${event.userName} joined the room! 🎉`, { icon: "👋" });
+    } else if (event.type === "USER_LEFT") {
+      toast(`${event.userName} left the room`, { icon: "🚪" });
+    } else if (event.type === "USER_KICKED") {
+      const isTarget =
+        event.targetUserId === self?.connectionId.toString() ||
+        (user && event.targetUserName === user.name);
+
+      if (isTarget) {
+        toast.error("You were removed from the room by the admin.");
+        router.push("/collaborate");
+      } else {
+        toast(`${event.targetUserName} was removed from the room`, { icon: "🚪" });
+      }
+    } else if (event.type === "CHAT_MESSAGE") {
+      playChatMessageSound();
+      setMessages((prev) => [...prev, event.message]);
+      if (!isChatOpen) {
+        setUnreadCount((c) => c + 1);
+      }
+    } else if (event.type === "CODE_EXECUTED") {
+      toast(`${event.userName} ran the code!`, { icon: "⚡" });
       runCode();
+    } else if (event.type === "LANGUAGE_CHANGED") {
+      setLanguage(event.language, true);
+    } else if (event.type === "ROOM_LOCK_TOGGLED") {
+      setIsLocked(event.isLocked);
+      toast(
+        event.isLocked
+          ? `Room set to Read-Only Presentation Mode by ${event.lockedBy}`
+          : `Room unlocked for Open Collaboration by ${event.lockedBy}`,
+        { icon: event.isLocked ? "🔒" : "🔓" }
+      );
+    } else if (event.type === "OUTPUT_UPDATED") {
+      isReceivingRemoteOutput.current = true;
+      useCodeEditorStore.setState({
+        output: event.output,
+        error: event.error,
+        isRunning: event.isRunning,
+      });
+      setTimeout(() => {
+        isReceivingRemoteOutput.current = false;
+      }, 100);
+    } else if (event.type === "TIMER_UPDATED") {
+      setTimerEndTime(event.timerEndTime);
+      if (event.isTimerRunning && event.durationMinutes > 0) {
+        toast(`Timer set to ${event.durationMinutes}m by Admin`, { icon: "⏱️" });
+      }
+    }
+  });
+
+  const handleStartTimer = (durationMinutes: number) => {
+    const endTime = Date.now() + durationMinutes * 60 * 1000;
+    setTimerEndTime(endTime);
+    setShowTimerMenu(false);
+    broadcast({
+      type: "TIMER_UPDATED",
+      timerEndTime: endTime,
+      durationMinutes,
+      isTimerRunning: true,
+    });
+    toast.success(`Started ${durationMinutes}m challenge timer!`);
+  };
+
+  const handleStopTimer = () => {
+    setTimerEndTime(null);
+    setShowTimerMenu(false);
+    broadcast({
+      type: "TIMER_UPDATED",
+      timerEndTime: null,
+      durationMinutes: 0,
+      isTimerRunning: false,
+    });
+    toast("Timer stopped", { icon: "⏱️" });
+  };
+
+  const handleExportCode = () => {
+    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
+    if (!editorCode.trim()) {
+      toast.error("Code editor is empty");
+      return;
+    }
+
+    const currentLangConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.javascript;
+    const blob = new Blob([editorCode], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pixelcode-${roomId}${currentLangConfig.fileExtension}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    playChatMessageSound();
+    toast.success(`Exported code as ${currentLangConfig.fileName}`);
+  };
+
+  const handleSaveToSnippets = () => {
+    if (!user) {
+      toast.error("Please sign in to save snippets");
+      return;
+    }
+
+    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
+    if (!editorCode.trim()) {
+      toast.error("Code editor is empty");
+      return;
+    }
+
+    setShowSaveSnippetModal(true);
+  };
+
+  const handleSaveToSnippetsConfirmed = async (title: string, isPublic: boolean) => {
+    if (!user) {
+      toast.error("Please sign in to save snippets");
+      return;
+    }
+
+    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
+    if (!editorCode.trim()) {
+      toast.error("Code editor is empty");
+      return;
+    }
+
+    await createSnippetMut({
+      userId: user.userId,
+      userName: user.name || "Anonymous Developer",
+      title,
+      language: language || "javascript",
+      code: editorCode,
+      isPublic,
     });
 
-    return () => {
-      socket.off("code-update");
-      socket.off("language-update");
-      socket.off("code-execution");
-    };
-  }, [
-    socket,
-    isConnected,
-    roomId,
-    user,
-    editor,
-    setLanguage,
-    runCode,
-    isAdmin,
-  ]);
-
-  const isLanguageChangingRef = useRef(false);
-  const codeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // ─── Track Admin live code typing and cursor position ───
-  useEffect(() => {
-    if (!editor || !isAdmin || !user || !roomId) return;
-
-    // Code change listener
-    const contentDisposable = editor.onDidChangeModelContent(() => {
-      if (isRemoteUpdatingRef.current || isLanguageChangingRef.current) return;
-      const code = editor.getValue();
-
-      // Debounce Convex code updates to prevent re-render thrashing
-      if (codeUpdateTimeoutRef.current) {
-        clearTimeout(codeUpdateTimeoutRef.current);
-      }
-
-      codeUpdateTimeoutRef.current = setTimeout(() => {
-        updateSessionCodeMut({ roomId, code });
-      }, 300);
-
-      if (socket && isConnected) {
-        socket.emit("code-change", {
-          roomId,
-          code,
-          language: useCodeEditorStore.getState().language,
-        });
-      }
-    });
-
-    // Cursor position listener
-    const cursorDisposable = editor.onDidChangeCursorPosition(
-      (e: { position: { lineNumber: number; column: number } }) => {
-        if (e.position) {
-          updateCursorPositionMut({
-            roomId,
-            userId: user.userId,
-            cursorLine: e.position.lineNumber,
-            cursorColumn: e.position.column,
-          });
-
-          if (socket && isConnected) {
-            socket.emit("cursor-change", {
-              roomId,
-              position: {
-                lineNumber: e.position.lineNumber,
-                column: e.position.column,
-              },
-            });
-          }
-        }
-      },
+    playRoomCreatedSound();
+    toast.success(
+      isPublic
+        ? "Snippet published to Community Snippets! 🌍"
+        : "Snippet saved privately to your library 🔒"
     );
+  };
 
-    return () => {
-      contentDisposable.dispose();
-      cursorDisposable.dispose();
-      if (codeUpdateTimeoutRef.current) {
-        clearTimeout(codeUpdateTimeoutRef.current);
-      }
+  // ─── Broadcast USER_JOINED when entering room via URL ───
+  useEffect(() => {
+    if (self) {
+      const currentName = user?.name || "Guest Developer";
+      broadcast({ type: "USER_JOINED", userName: currentName });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [self?.connectionId]);
+
+  const handleKickUser = (targetUserId: string, targetUserName: string) => {
+    if (!isAdmin) return;
+    toast.success(`Removed ${targetUserName} from room`);
+    broadcast({
+      type: "USER_KICKED",
+      targetUserId,
+      targetUserName,
+    });
+  };
+
+  const handleToggleLock = () => {
+    if (!isAdmin) return;
+    const nextLocked = !isLocked;
+    setIsLocked(nextLocked);
+    broadcast({
+      type: "ROOM_LOCK_TOGGLED",
+      isLocked: nextLocked,
+      lockedBy: user?.name || "Admin",
+    });
+    toast.success(
+      nextLocked
+        ? "Room locked to Read-Only Presentation mode"
+        : "Room unlocked for Open Collaboration"
+    );
+  };
+
+  const handleFollowUser = (targetUserName: string) => {
+    if (followedUserName === targetUserName) {
+      setFollowedUserName(null);
+      toast("Stopped following cursor", { icon: "🎯" });
+    } else {
+      setFollowedUserName(targetUserName);
+      toast(`Following ${targetUserName}'s cursor`, { icon: "🎯" });
+    }
+  };
+
+  const handleSendMessage = (text: string) => {
+    playChatMessageSound();
+    const currentName = user?.name || "Guest Developer";
+    const presenceUser = self?.presence?.user as { color?: string } | undefined;
+    const infoUser = self?.info as { color?: string } | undefined;
+    const userColor = presenceUser?.color || infoUser?.color || "#58a6ff";
+
+    const newMessage: ChatMessage = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      senderId: self?.connectionId.toString() || "local",
+      senderName: currentName,
+      senderColor: userColor,
+      text,
+      timestamp: Date.now(),
     };
-  }, [
-    editor,
-    isAdmin,
-    user,
-    roomId,
-    socket,
-    isConnected,
-    updateSessionCodeMut,
-    updateCursorPositionMut,
-  ]);
+
+    setMessages((prev) => [...prev, newMessage]);
+
+    broadcast({
+      type: "CHAT_MESSAGE",
+      message: newMessage,
+    });
+  };
+
+  // ─── Broadcast code execution output to all room participants ───
+  useEffect(() => {
+    let lastOutput = "";
+    let lastError: string | null = null;
+    let lastRunning = false;
+
+    const unsubscribe = useCodeEditorStore.subscribe((state) => {
+      if (isReceivingRemoteOutput.current) return;
+
+      if (
+        state.output === lastOutput &&
+        state.error === lastError &&
+        state.isRunning === lastRunning
+      ) {
+        return;
+      }
+
+      lastOutput = state.output;
+      lastError = state.error;
+      lastRunning = state.isRunning;
+
+      broadcast({
+        type: "OUTPUT_UPDATED",
+        output: state.output,
+        error: state.error,
+        isRunning: state.isRunning,
+        userName: user?.name || "Collaborator",
+      });
+    });
+    return () => unsubscribe();
+  }, [broadcast, user?.name]);
+
+  // ─── Sync session language from Convex ───
+  useEffect(() => {
+    if (session?.language && session.language !== language) {
+      setLanguage(session.language, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.language]);
+
+  // ─── Admin language change → Convex + Liveblocks broadcast ───
+  useEffect(() => {
+    if (
+      isAdmin &&
+      roomId &&
+      language &&
+      session &&
+      session.language !== language
+    ) {
+      updateSessionCodeMut({
+        roomId,
+        code: session.code || "",
+        language,
+      });
+
+      broadcast({ type: "LANGUAGE_CHANGED", language });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, language]);
+
+  // ─── Auto-redirect if room is deleted ───
+  useEffect(() => {
+    if (session === null && roomAdmin !== undefined) {
+      playRoomDeletedSound();
+      toast("The room session has been ended by the Admin.", { icon: "ℹ️" });
+      router.push("/collaborate");
+    }
+  }, [session, roomAdmin, router]);
+
+  // ─── Persist code changes to Convex (debounced, called by editor) ───
+  const handleCodeChange = useCallback(
+    (code: string) => {
+      if (roomId) {
+        updateSessionCodeMut({ roomId, code });
+      }
+    },
+    [roomId, updateSessionCodeMut],
+  );
 
   const copyRoomLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href);
@@ -282,8 +487,10 @@ export default function CollaborativeRoomPage() {
   }, []);
 
   const handleLeave = useCallback(() => {
+    const currentName = user?.name || "Guest Developer";
+    broadcast({ type: "USER_LEFT", userName: currentName });
     router.push("/collaborate");
-  }, [router]);
+  }, [broadcast, user?.name, router]);
 
   const handleDeleteRoom = useCallback(async () => {
     if (!user || !roomId) return;
@@ -294,6 +501,7 @@ export default function CollaborativeRoomPage() {
     ) {
       try {
         await deleteSessionMut({ roomId, userId: user.userId });
+        playRoomDeletedSound();
         toast.success("Room session deleted");
         router.push("/collaborate");
       } catch {
@@ -302,76 +510,10 @@ export default function CollaborativeRoomPage() {
     }
   }, [user, roomId, deleteSessionMut, router]);
 
-  // Auto-redirect contributors if room is ended/deleted by Admin
-  useEffect(() => {
-    if (session === null && roomAdmin !== undefined) {
-      toast("The room session has been ended by the Admin.", { icon: "ℹ️" });
-      router.push("/collaborate");
-    }
-  }, [session, roomAdmin, router]);
-
-  const prevSessionLangRef = useRef<string | null>(null);
-
-  // ─── Sync Convex session language to local editor store for all users ───
-  useEffect(() => {
-    if (session?.language && session.language !== language) {
-      prevSessionLangRef.current = session.language;
-      isLanguageChangingRef.current = true;
-      setLanguage(session.language, true);
-
-      setTimeout(() => {
-        isLanguageChangingRef.current = false;
-      }, 500);
-    }
-  }, [session?.language, language, setLanguage]);
-
-  // ─── Sync Admin language changes to Convex session & Socket ───
-  useEffect(() => {
-    if (
-      isAdmin &&
-      roomId &&
-      language &&
-      session &&
-      session.language !== language &&
-      prevSessionLangRef.current !== language
-    ) {
-      prevSessionLangRef.current = language;
-      isLanguageChangingRef.current = true;
-
-      updateSessionCodeMut({
-        roomId,
-        code: editor?.getValue() || session.code || "",
-        language,
-      });
-
-      if (socket && isConnected) {
-        socket.emit("language-change", { roomId, language });
-      }
-
-      setTimeout(() => {
-        isLanguageChangingRef.current = false;
-      }, 500);
-    }
-  }, [
-    isAdmin,
-    roomId,
-    language,
-    session,
-    editor,
-    socket,
-    isConnected,
-    updateSessionCodeMut,
-  ]);
-
-  const activeCount = participants?.length ?? 0;
-  const currentSessionCode = session?.code || "";
-  const adminParticipant = participants?.find(
-    (p) => roomAdmin && p.userId === roomAdmin.hostUserId,
-  );
-
-  const adminLanguageId = session?.language || language || "javascript";
-  const adminLangConfig =
-    LANGUAGE_CONFIG[adminLanguageId] || LANGUAGE_CONFIG.javascript;
+  const currentSessionCode =
+    session?.code !== undefined
+      ? session.code
+      : useCodeEditorStore.getState().getCode();
 
   return (
     <div className="flex flex-col h-screen bg-canvas">
@@ -404,7 +546,7 @@ export default function CollaborativeRoomPage() {
               ) : (
                 <>
                   <Code2 className="w-3 h-3" />
-                  Contributor
+                  Collaborator
                 </>
               )}
             </div>
@@ -412,68 +554,121 @@ export default function CollaborativeRoomPage() {
 
           <span className="text-hairline">|</span>
 
-          {/* Active users with avatars */}
-          <div className="flex items-center gap-2">
-            {participants && participants.length > 0 && (
-              <div className="flex items-center -space-x-1.5">
-                {participants.slice(0, 5).map((p) => (
-                  <div
-                    key={p.userId}
-                    className={`w-6 h-6 rounded-full font-semibold text-[10px] flex items-center justify-center uppercase border-2 border-canvas-soft-2 shrink-0 ${
-                      roomAdmin && p.userId === roomAdmin.hostUserId
-                        ? "bg-link/20 text-link ring-1 ring-link/40"
-                        : "bg-link/15 text-link"
-                    }`}
-                    title={`${p.userName}${roomAdmin && p.userId === roomAdmin.hostUserId ? " (Admin)" : ""}`}
-                  >
-                    {p.userName.charAt(0)}
-                  </div>
-                ))}
-                {participants.length > 5 && (
-                  <div className="w-6 h-6 rounded-full bg-canvas-soft text-mute font-semibold text-[10px] flex items-center justify-center border-2 border-canvas-soft-2 shrink-0">
-                    +{participants.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <Users className="w-3.5 h-3.5 text-mute" />
-            <span className="text-caption text-body">
-              {activeCount} Active {activeCount === 1 ? "User" : "Users"}
-            </span>
-          </div>
+          {/* Live avatars (Liveblocks-powered with Admin Kick Controls) */}
+          <LiveAvatars 
+            isAdmin={isAdmin} 
+            onKickUser={handleKickUser} 
+            onFollowUser={handleFollowUser}
+            followedUserName={followedUserName}
+          />
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Change Requests button (visible to both, but admin gets badge) */}
+          {/* Room Challenge Timer Display & Menu */}
+          {timerRemainingSeconds !== null && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-link/15 border border-link/30 text-link font-mono font-bold text-xs animate-pulse">
+              <TimerIcon className="w-3.5 h-3.5" />
+              <span>
+                {Math.floor(timerRemainingSeconds / 60)}:
+                {String(timerRemainingSeconds % 60).padStart(2, "0")}
+              </span>
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="relative">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowTimerMenu((prev) => !prev)}
+                icon={<TimerIcon className="w-3.5 h-3.5" />}
+              >
+                Timer
+              </Button>
+
+              {showTimerMenu && (
+                <div className="absolute top-full right-0 mt-1.5 z-50 w-44 bg-canvas-dark border border-hairline/80 rounded-xl shadow-2xl backdrop-blur-xl p-1.5 flex flex-col gap-1 text-xs">
+                  <span className="px-2 py-1 font-semibold text-mute text-[10px] uppercase tracking-wider">
+                    Start Challenge Timer
+                  </span>
+                  {[15, 30, 45, 60].map((mins) => (
+                    <button
+                      key={mins}
+                      onClick={() => handleStartTimer(mins)}
+                      className="px-2.5 py-1.5 rounded-md text-left hover:bg-surface text-foreground transition-colors font-medium"
+                    >
+                      {mins} Minutes Sprint
+                    </button>
+                  ))}
+                  {timerRemainingSeconds !== null && (
+                    <button
+                      onClick={handleStopTimer}
+                      className="px-2.5 py-1.5 rounded-md text-left hover:bg-error/15 text-error transition-colors font-medium border-t border-hairline/50 mt-1"
+                    >
+                      Stop Timer
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 1-Click Code Export */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportCode}
+            icon={<Download className="w-3.5 h-3.5" />}
+            title="Download room code file"
+          >
+            Export
+          </Button>
+
+          {/* Save to Snippets → opens modal for title & visibility */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSaveToSnippets}
+            icon={<FolderPlus className="w-3.5 h-3.5" />}
+            title="Save code to your personal Snippets dashboard"
+          >
+            Save Snippet
+          </Button>
+
+          {/* Admin Lock / Read-Only Toggle Button */}
           {isAdmin && (
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setIsReviewPanelOpen(true)}
-              icon={<GitPullRequest className="w-3.5 h-3.5" />}
-              className={pendingCount > 0 ? "border-warning text-warning" : ""}
+              onClick={handleToggleLock}
+              icon={isLocked ? <Lock className="w-3.5 h-3.5 text-warning" /> : <Unlock className="w-3.5 h-3.5 text-success" />}
+              className={isLocked ? "border-warning text-warning font-semibold" : ""}
             >
-              Requests
-              {pendingCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-warning/15 text-warning text-[10px] font-bold tabular-nums">
-                  {pendingCount}
-                </span>
-              )}
+              {isLocked ? "Locked Mode" : "Open Editing"}
             </Button>
           )}
 
-          {/* Submit changes button (contributors only) */}
-          {!isAdmin && user && roomAdmin && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => setIsSubmitModalOpen(true)}
-              icon={<Send className="w-3.5 h-3.5" />}
-            >
-              Submit Changes
-            </Button>
-          )}
+          {/* Live Chat Session Button */}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setIsChatOpen((prev) => !prev);
+              setUnreadCount(0);
+            }}
+            icon={<MessageSquare className="w-3.5 h-3.5" />}
+            className={unreadCount > 0 ? "border-link text-link font-semibold" : ""}
+          >
+            Chat
+            {unreadCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-link text-white text-[10px] font-bold tabular-nums">
+                {unreadCount}
+              </span>
+            )}
+          </Button>
+
+          {/* Voice Chat Controls */}
+          <VoiceChatControls currentUserId={user?.userId || "anonymous"} />
 
           <Button
             variant="secondary"
@@ -516,211 +711,95 @@ export default function CollaborativeRoomPage() {
 
       <EditorTopBar />
 
-      {/* Main editor area */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-        <div className="flex-1 min-h-0 min-w-0 border-r border-hairline flex flex-col">
-          {isAdmin ? (
-            /* Admin: direct code editing */
-            <CodePanel />
-          ) : (
-            /* Contributor: read-only admin code + draft editor */
-            <>
-              {/* Admin's code (read-only reference with live cursor, file name & language badge) */}
-              <div className="flex-[2] min-h-0 flex flex-col border-b border-hairline">
-                <div className="h-10 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-caption">
-                      <Shield className="w-3.5 h-3.5 text-link" />
-                      <span className="font-mono text-ink font-semibold">
-                        Admin&apos;s Code
-                      </span>
-                    </div>
-
-                    {/* Active File Name & Language Badge */}
-                    <div className="flex items-center gap-2 px-2.5 py-0.5 rounded bg-canvas border border-hairline font-mono text-caption text-ink">
-                      <FileCode className="w-3.5 h-3.5 text-link" />
-                      <span className="font-semibold">
-                        {adminLangConfig.fileName}
-                      </span>
-                      <span className="text-hairline">|</span>
-                      <div className="flex items-center gap-1 text-mute">
-                        <img
-                          src={adminLangConfig.logoPath}
-                          alt=""
-                          className="w-3.5 h-3.5 object-contain"
-                        />
-                        <span className="font-medium text-ink">
-                          {adminLangConfig.label}
-                        </span>
-                      </div>
-                    </div>
-                    {/* View Mode Toggle: Split View vs Side-by-Side Diff */}
-                    <div className="flex items-center p-0.5 rounded bg-canvas border border-hairline text-caption">
-                      <button
-                        onClick={() => setContributorViewMode("split")}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
-                          contributorViewMode === "split"
-                            ? "bg-canvas-soft-2 text-ink font-medium"
-                            : "text-mute hover:text-ink"
-                        }`}
-                        title="Split view"
-                      >
-                        <Split className="w-3 h-3" />
-                        <span>Split</span>
-                      </button>
-                      <button
-                        onClick={() => setContributorViewMode("diff")}
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
-                          contributorViewMode === "diff"
-                            ? "bg-canvas-soft-2 text-ink font-medium"
-                            : "text-mute hover:text-ink"
-                        }`}
-                        title="Side-by-side diff view"
-                      >
-                        <Columns className="w-3 h-3" />
-                        <span>Side-by-Side Diff</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {adminParticipant?.cursorLine && (
-                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-link/15 text-link font-mono text-[11px] font-medium border border-link/30 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-link animate-ping" />
-                      <span>
-                        {adminParticipant.userName} at Ln{" "}
-                        {adminParticipant.cursorLine}, Col{" "}
-                        {adminParticipant.cursorColumn || 1}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {contributorViewMode === "diff" ? (
-                  <div className="flex-1 min-h-0 p-3 bg-canvas">
-                    <SideBySideDiff
-                      originalCode={currentSessionCode}
-                      proposedCode={draftCode}
-                      originalTitle={`Admin Code (${adminLangConfig.fileName})`}
-                      proposedTitle="Your Draft (Proposed Changes)"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex-1 min-h-0 p-3 overflow-auto bg-canvas font-mono text-code text-ink">
-                    {(
-                      currentSessionCode ||
-                      "// Waiting for admin to write code..."
-                    )
-                      .split("\n")
-                      .map((line, idx) => {
-                        const lineNumber = idx + 1;
-                        const isCursorLine =
-                          adminParticipant?.cursorLine === lineNumber;
-                        const col = adminParticipant?.cursorColumn || 0;
-
-                        let lineText = line;
-                        if (isCursorLine && col > 0 && col <= line.length + 1) {
-                          const before = line.slice(0, col - 1);
-                          const after = line.slice(col - 1);
-                          lineText = before + "│" + after;
-                        }
-
-                        return (
-                          <div
-                            key={idx}
-                            className={`flex items-start gap-3 px-2 py-0.5 rounded transition-colors ${
-                              isCursorLine
-                                ? "bg-link/15 border-l-2 border-link text-ink font-semibold"
-                                : "text-body hover:bg-canvas-soft-2/50"
-                            }`}
-                          >
-                            <span className="w-7 text-right text-mute/50 text-[11px] select-none shrink-0 font-mono">
-                              {lineNumber}
-                            </span>
-                            <span className="whitespace-pre-wrap break-all leading-relaxed flex-1">
-                              {lineText || " "}
-                            </span>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-
-              {/* Draft editor */}
-              <div className="flex-[3] min-h-0 flex flex-col">
-                <div className="h-10 px-4 bg-canvas-soft border-b border-hairline flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-caption">
-                    <Code2 className="w-3.5 h-3.5 text-success" />
-                    <span className="font-mono text-ink font-medium text-body-sm">
-                      Your Draft
-                    </span>
-                    <span className="hidden sm:inline text-mute">
-                      — edit here & submit to admin for review
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        setDraftCode(currentSessionCode);
-                        toast.success("Draft reset to admin's current code");
-                      }}
-                      className="text-caption text-mute hover:text-ink transition-colors"
-                    >
-                      Reset to Admin&apos;s Code
-                    </button>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => setIsSubmitModalOpen(true)}
-                      icon={<Send className="w-3.5 h-3.5" />}
-                    >
-                      Send Request to Admin
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex-1 min-h-0 relative">
-                  <textarea
-                    value={draftCode}
-                    onChange={(e) => setDraftCode(e.target.value)}
-                    spellCheck={false}
-                    className="absolute inset-0 w-full h-full p-4 bg-canvas text-ink font-mono text-code resize-none focus:outline-none leading-relaxed"
-                    placeholder="Type your code changes here, then click 'Send Request to Admin'..."
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="lg:w-[420px] min-h-0 flex flex-col border-t lg:border-t-0 border-hairline">
-          <OutputPanel />
-        </div>
-      </div>
+      {/* Main editor area — Draggable Resizable Splitter between Code Editor and Output Console */}
+      <ResizableEditorLayout
+        left={
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col h-full">
+            <CollaborativeCodeEditor
+              currentUser={{
+                name: user?.name || "Guest Developer",
+              }}
+              initialCode={currentSessionCode}
+              onCodeChange={handleCodeChange}
+              followedUserName={followedUserName}
+              onStopFollow={() => setFollowedUserName(null)}
+              isLocked={isLocked}
+              isAdmin={isAdmin}
+            />
+          </div>
+        }
+        right={
+          <div className="h-full flex flex-col">
+            <OutputPanel />
+          </div>
+        }
+      />
 
       <StatusBar />
 
-      {/* Modals & Panels */}
-      {isAdmin && (
-        <ChangeRequestPanel
-          isOpen={isReviewPanelOpen}
-          onClose={() => setIsReviewPanelOpen(false)}
-          roomId={roomId}
-          adminName={user?.name || "Admin"}
-        />
-      )}
+      {/* Live Room Chat Drawer */}
+      <RoomChatPanel
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        messages={messages}
+        onSendMessage={handleSendMessage}
+        currentUserId={self?.connectionId.toString() || "local"}
+      />
 
-      {!isAdmin && user && (
-        <SubmitChangesModal
-          isOpen={isSubmitModalOpen}
-          onClose={() => setIsSubmitModalOpen(false)}
-          roomId={roomId}
-          authorUserId={user.userId}
-          authorUserName={user.name || "Anonymous"}
-          originalCode={currentSessionCode}
-          proposedCode={draftCode}
-          language={language || "javascript"}
-        />
-      )}
+      {/* Save Snippet Modal with Public/Private selection */}
+      <SaveSnippetModal
+        isOpen={showSaveSnippetModal}
+        onClose={() => setShowSaveSnippetModal(false)}
+        onSave={handleSaveToSnippetsConfirmed}
+        language={language || "javascript"}
+        roomId={roomId}
+      />
     </div>
+  );
+}
+
+// ─── Loading state ───
+function CollaborativeRoomLoading() {
+  return (
+    <div className="flex flex-col h-screen bg-canvas">
+      <NavigationHeader />
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-link animate-spin" />
+          <div className="text-center">
+            <p className="text-body-sm font-medium text-ink">
+              Connecting to collaborative session...
+            </p>
+            <p className="text-caption text-mute mt-1">
+              Setting up real-time sync with Liveblocks
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page component (wraps in RoomProvider) ───
+export default function CollaborativeRoomPage() {
+  const params = useParams();
+  const roomId = params?.roomId as string;
+
+  if (!roomId) return null;
+
+  // The Liveblocks room ID is prefixed to avoid collisions with other apps
+  const liveblocksRoomId = `pixelcode:${roomId}`;
+
+  return (
+    <RoomProvider
+      id={liveblocksRoomId}
+      initialPresence={{
+        cursor: null,
+      }}
+    >
+      <ClientSideSuspense fallback={<CollaborativeRoomLoading />}>
+        <CollaborativeRoomContent roomId={roomId} />
+      </ClientSideSuspense>
+    </RoomProvider>
   );
 }

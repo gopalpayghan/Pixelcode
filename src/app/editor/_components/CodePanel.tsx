@@ -66,6 +66,13 @@ export default function CodePanel() {
             smoothScrolling: true,
             cursorBlinking: "smooth",
             lineNumbersMinChars: 3,
+            inlineSuggest: { enabled: true },
+            quickSuggestions: { other: true, comments: true, strings: true },
+            suggestOnTriggerCharacters: true,
+            snippetSuggestions: "inline",
+            acceptSuggestionOnEnter: "on",
+            tabCompletion: "on",
+            wordBasedSuggestions: "allDocuments",
           }}
         />
       </div>

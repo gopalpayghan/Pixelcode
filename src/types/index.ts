@@ -14,6 +14,8 @@ export interface Language {
   monacoLanguage: string;
   defaultCode: string;
   pistonRuntime: LanguageRuntime;
+  fileExtension: string;
+  fileName: string;
 }
 
 export interface LanguageRuntime {
@@ -47,7 +49,7 @@ export interface CodeEditorState {
   editor: Monaco | null;
   executionResult: ExecutionResult | null;
 
-  setEditor: (editor: Monaco) => void;
+  setEditor: (editor: Monaco, preserveValue?: boolean) => void;
   getCode: () => string;
   setLanguage: (language: string, preserveCode?: boolean) => void;
   setTheme: (theme: string) => void;
@@ -63,4 +65,5 @@ export interface Snippet {
   code: string;
   title: string;
   userName: string;
+  isPublic?: boolean;
 }

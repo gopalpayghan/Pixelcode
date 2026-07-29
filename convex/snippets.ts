@@ -8,6 +8,7 @@ export const createSnippet = mutation({
     title: v.string(),
     language: v.string(),
     code: v.string(),
+    isPublic: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (!args.userId) throw new Error("User ID is required");
@@ -18,6 +19,7 @@ export const createSnippet = mutation({
       title: args.title,
       language: args.language,
       code: args.code,
+      isPublic: args.isPublic ?? true,
     });
 
     return snippetId;
@@ -124,6 +126,20 @@ export const deleteComment = mutation({
 export const getSnippets = query({
   handler: async (ctx) => {
     const snippets = await ctx.db.query("snippets").order("desc").collect();
+    // Only expose public snippets (isPublic === true, or legacy rows where field is absent)
+    return snippets.filter((s) => s.isPublic !== false);
+  },
+});
+
+export const getMySnippets = query({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.userId) return [];
+    const snippets = await ctx.db
+      .query("snippets")
+      .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .collect();
     return snippets;
   },
 });

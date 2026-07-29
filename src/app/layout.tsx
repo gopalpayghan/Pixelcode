@@ -4,6 +4,7 @@ import "./globals.css";
 import ConvexClientProvider from "@/components/providers/ConvexClientProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { SocketProvider } from "@/components/providers/SocketProvider";
+import { LiveblocksProviderWrapper } from "@/components/providers/LiveblocksProvider";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = localFont({
@@ -55,9 +56,11 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <ConvexClientProvider>
-            <SocketProvider>{children}</SocketProvider>
-          </ConvexClientProvider>
+          <LiveblocksProviderWrapper>
+            <ConvexClientProvider>
+              <SocketProvider>{children}</SocketProvider>
+            </ConvexClientProvider>
+          </LiveblocksProviderWrapper>
         </AuthProvider>
 
         <Toaster

@@ -9,7 +9,7 @@ import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import ProfileHeader from "./_components/ProfileHeader";
 import ProfileHeaderSkeleton from "./_components/ProfileHeaderSkeleton";
-import { Clock, Code, ListVideo, Loader2, Star } from "lucide-react";
+import { Clock, Code, FolderOpen, Globe, ListVideo, Loader2, Lock, Star, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,12 +17,19 @@ import StarButton from "@/components/StarButton";
 import CodeBlock from "./_components/CodeBlock";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useMutation } from "convex/react";
+import toast from "react-hot-toast";
 
 const TABS = [
   {
     id: "executions",
     label: "Code Executions",
     icon: ListVideo,
+  },
+  {
+    id: "mysnippets",
+    label: "My Snippets",
+    icon: FolderOpen,
   },
   {
     id: "starred",
@@ -34,9 +41,7 @@ const TABS = [
 function ProfilePage() {
   const { user, isLoading } = useAuthContext();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"executions" | "starred">(
-    "executions",
-  );
+  const [activeTab, setActiveTab] = useState<"executions" | "mysnippets" | "starred">("executions");
 
   const userStats = useQuery(api.codeExecutions.getUserStats, {
     userId: user?.userId ?? "",
@@ -45,6 +50,12 @@ function ProfilePage() {
   const starredSnippets = useQuery(api.snippets.getStarredSnippets, {
     userId: user?.userId ?? "",
   });
+
+  const mySnippets = useQuery(api.snippets.getMySnippets, {
+    userId: user?.userId ?? "",
+  });
+
+  const deleteSnippetMut = useMutation(api.snippets.deleteSnippet);
 
   const {
     results: executions,
@@ -92,7 +103,7 @@ function ProfilePage() {
                 <button
                   key={tab.id}
                   onClick={() =>
-                    setActiveTab(tab.id as "executions" | "starred")
+                    setActiveTab(tab.id as "executions" | "mysnippets" | "starred")
                   }
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-t-md text-body-sm font-medium transition-colors border-b-2 ${
                     activeTab === tab.id
@@ -102,6 +113,11 @@ function ProfilePage() {
                 >
                   <tab.icon className="w-4 h-4" />
                   <span>{tab.label}</span>
+                  {tab.id === "mysnippets" && mySnippets && mySnippets.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full bg-link/20 text-link text-[10px] font-bold">
+                      {mySnippets.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -208,6 +224,91 @@ function ProfilePage() {
                           >
                             Load More Executions
                           </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === "mysnippets" && (
+                    <div className="space-y-3">
+                      {mySnippets === undefined && (
+                        <div className="text-center py-12">
+                          <Loader2 className="w-8 h-8 text-mute mx-auto mb-3 animate-spin" />
+                          <p className="text-body-sm text-mute">Loading your snippets...</p>
+                        </div>
+                      )}
+
+                      {mySnippets?.map((snippet) => (
+                        <div
+                          key={snippet._id}
+                          className="bg-canvas-soft border border-hairline hover:border-hairline-strong rounded-xl p-4 transition-all shadow-level-1 hover:shadow-level-2"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            {/* Left: Language + Title */}
+                            <Link href={snippet.isPublic !== false ? `/snippets/${snippet._id}` : "#"} className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <Image
+                                  src={`/${snippet.language}.png`}
+                                  alt=""
+                                  width={18}
+                                  height={18}
+                                  className="object-contain"
+                                />
+                                <span className="text-caption font-mono text-mute capitalize">{snippet.language}</span>
+                                {/* Visibility Badge */}
+                                {snippet.isPublic !== false ? (
+                                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 border border-success/20 text-success text-[10px] font-semibold">
+                                    <Globe className="w-2.5 h-2.5" />
+                                    Public
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 border border-warning/20 text-warning text-[10px] font-semibold">
+                                    <Lock className="w-2.5 h-2.5" />
+                                    Private
+                                  </span>
+                                )}
+                              </div>
+                              <h3 className="text-body-sm font-semibold text-ink line-clamp-1">{snippet.title}</h3>
+                              <div className="flex items-center gap-1.5 text-caption text-mute mt-1">
+                                <Clock className="w-3 h-3" />
+                                <span>{new Date(snippet._creationTime).toLocaleDateString()}</span>
+                              </div>
+                            </Link>
+
+                            {/* Right: Delete */}
+                            <button
+                              onClick={async () => {
+                                if (!user) return;
+                                try {
+                                  await deleteSnippetMut({ snippetId: snippet._id, userId: user.userId });
+                                  toast.success("Snippet deleted");
+                                } catch {
+                                  toast.error("Failed to delete snippet");
+                                }
+                              }}
+                              className="p-1.5 rounded-md text-mute hover:text-error hover:bg-error/10 transition-colors shrink-0"
+                              title="Delete snippet"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          {/* Code preview */}
+                          <div className="mt-3 bg-canvas border border-hairline rounded-md p-3 overflow-hidden">
+                            <pre className="font-mono text-caption text-body line-clamp-2 leading-relaxed">
+                              {snippet.code}
+                            </pre>
+                          </div>
+                        </div>
+                      ))}
+
+                      {mySnippets?.length === 0 && (
+                        <div className="text-center py-12">
+                          <FolderOpen className="w-8 h-8 text-mute mx-auto mb-3" />
+                          <h3 className="text-body-md font-semibold text-ink mb-1">No snippets yet</h3>
+                          <p className="text-body-sm text-mute">
+                            Share or save code snippets from the editor to see them here.
+                          </p>
                         </div>
                       )}
                     </div>

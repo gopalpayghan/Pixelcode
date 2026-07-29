@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
@@ -13,10 +13,25 @@ import Link from "next/link";
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn } = useAuthContext();
+  const { user, isLoading, signIn } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      const redirectTo = searchParams?.get("redirect") || "/editor";
+      router.replace(redirectTo);
+    }
+  }, [user, isLoading, router, searchParams]);
+
+  if (isLoading || user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-canvas">
+        <div className="w-8 h-8 border-2 border-hairline border-t-ink rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

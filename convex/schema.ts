@@ -30,7 +30,10 @@ export default defineSchema({
     language: v.string(),
     code: v.string(),
     userName: v.string(),
-  }).index("by_user_id", ["userId"]),
+    isPublic: v.optional(v.boolean()),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_is_public", ["isPublic"]),
 
   snippetComments: defineTable({
     snippetId: v.id("snippets"),
@@ -55,6 +58,8 @@ export default defineSchema({
     code: v.string(),
     title: v.string(),
     isActive: v.boolean(),
+    activeEditorUserId: v.optional(v.string()),
+    activeEditorUserName: v.optional(v.string()),
   })
     .index("by_room_id", ["roomId"])
     .index("by_host_user_id", ["hostUserId"]),

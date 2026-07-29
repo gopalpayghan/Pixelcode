@@ -83,9 +83,28 @@ export const endSession = mutation({
       throw new ConvexError("Only the session host can end the room");
     }
 
-    await ctx.db.patch(session._id, {
-      isActive: false,
-    });
+    // 1. Delete all roomParticipants for this room
+    const participants = await ctx.db
+      .query("roomParticipants")
+      .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
+      .collect();
+
+    for (const p of participants) {
+      await ctx.db.delete(p._id);
+    }
+
+    // 2. Delete all changeRequests for this room
+    const requests = await ctx.db
+      .query("changeRequests")
+      .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
+      .collect();
+
+    for (const r of requests) {
+      await ctx.db.delete(r._id);
+    }
+
+    // 3. Permanently delete the collaborativeSessions room document
+    await ctx.db.delete(session._id);
   },
 });
 
@@ -128,6 +147,27 @@ export const deleteSession = mutation({
 
     // Delete the session document itself
     await ctx.db.delete(session._id);
+  },
+});
+
+/**
+ * Auto-cleanup mutation: Purges abandoned rooms and stale participant records
+ * older than 1 hour to keep DB usage 100% temporary per room.
+ */
+export const cleanupInactiveRooms = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const oneHourAgo = Date.now() - 3600_000;
+
+    // 1. Purge stale participants inactive for > 1 hour
+    const staleParticipants = await ctx.db
+      .query("roomParticipants")
+      .filter((q) => q.lt(q.field("lastSeen"), oneHourAgo))
+      .collect();
+
+    for (const p of staleParticipants) {
+      await ctx.db.delete(p._id);
+    }
   },
 });
 

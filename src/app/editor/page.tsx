@@ -10,6 +10,8 @@ import StatusBar from "./_components/StatusBar";
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 
+import ResizableEditorLayout from "@/components/ResizableEditorLayout";
+
 function EditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -38,18 +40,19 @@ function EditorContent() {
       <NavigationHeader />
       <EditorTopBar />
 
-      {/* Main editor area */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-        {/* Code editor panel */}
-        <div className="flex-1 min-h-0 min-w-0 border-r border-hairline">
-          <CodePanel />
-        </div>
-
-        {/* Output panel */}
-        <div className="lg:w-[420px] min-h-0 flex flex-col border-t lg:border-t-0 border-hairline">
-          <OutputPanel />
-        </div>
-      </div>
+      {/* Main editor area — Draggable Resizable Splitter */}
+      <ResizableEditorLayout
+        left={
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col h-full">
+            <CodePanel />
+          </div>
+        }
+        right={
+          <div className="h-full flex flex-col">
+            <OutputPanel />
+          </div>
+        }
+      />
 
       <StatusBar />
     </div>

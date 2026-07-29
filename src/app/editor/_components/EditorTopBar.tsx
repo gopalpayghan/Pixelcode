@@ -3,14 +3,21 @@
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, THEMES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
-import { Play, Share2, Terminal, Sliders, Check, ChevronDown } from "lucide-react";
+import { Play, Share2, Terminal, Sliders, Check, ChevronDown, Users2, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-
+import { useRouter } from "next/navigation";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { useAuthContext } from "@/components/providers/AuthProvider";
+import toast from "react-hot-toast";
 import useMounted from "@/hooks/useMounted";
 import ShareSnippetModal from "./ShareSnippetModal";
 
 export default function EditorTopBar() {
   const mounted = useMounted();
+  const router = useRouter();
+  const { user } = useAuthContext();
+  const createSessionMut = useMutation(api.collaborativeSessions.createSession);
   const {
     language,
     setLanguage,
@@ -23,11 +30,13 @@ export default function EditorTopBar() {
     stdin,
     activeOutputTab,
     setActiveOutputTab,
+    getCode,
   } = useCodeEditorStore();
 
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +91,35 @@ export default function EditorTopBar() {
 
   const handleShare = () => {
     setIsShareModalOpen(true);
+  };
+
+  const handleCollaborate = async () => {
+    if (!user) {
+      toast.error("Please sign in to start a collaborative session");
+      return;
+    }
+
+    setIsCreatingRoom(true);
+    try {
+      const code = getCode() || "";
+      const roomId = `room-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+      await createSessionMut({
+        roomId,
+        title: `${LANGUAGE_CONFIG[language]?.label || language} Session`,
+        language,
+        code,
+        hostUserId: user.userId,
+        hostUserName: user.name || "Developer",
+      });
+
+      toast.success("Collaborative room created! Switching to collaborate mode...", { icon: "🚀" });
+      router.push(`/collaborate/${roomId}`);
+    } catch {
+      toast.error("Failed to create collaborative room");
+    } finally {
+      setIsCreatingRoom(false);
+    }
   };
 
   return (
@@ -208,6 +246,23 @@ export default function EditorTopBar() {
             className={activeOutputTab === "stdin" || stdin ? "border-link text-link" : ""}
           >
             STDIN {stdin ? "(Active)" : ""}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleCollaborate}
+            disabled={isCreatingRoom}
+            icon={
+              isCreatingRoom ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Users2 className="w-3.5 h-3.5" />
+              )
+            }
+            title="Open this code in a new collaborative room"
+          >
+            {isCreatingRoom ? "Creating Room..." : "Collaborate Mode"}
           </Button>
 
           <Button

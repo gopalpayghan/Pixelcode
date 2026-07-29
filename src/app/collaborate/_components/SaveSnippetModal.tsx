@@ -1,28 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { useCodeEditorStore } from "@/store/useCodeEditorStore";
-import { useAuthContext } from "@/components/providers/AuthProvider";
+import { Globe, Lock, X, FolderPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { X, Sparkles, Share2, Globe, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 
-interface ShareSnippetModalProps {
+interface SaveSnippetModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSave: (title: string, isPublic: boolean) => Promise<void>;
+  language: string;
+  roomId: string;
 }
 
-export default function ShareSnippetModal({ isOpen, onClose }: ShareSnippetModalProps) {
-  const { user } = useAuthContext();
-  const { language, getCode } = useCodeEditorStore();
-  const createSnippet = useMutation(api.snippets.createSnippet);
-
-  const [title, setTitle] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function SaveSnippetModal({
+  isOpen,
+  onClose,
+  onSave,
+  language,
+  roomId,
+}: SaveSnippetModalProps) {
+  const [title, setTitle] = useState(`Collaborative Session ${roomId}`);
+  const [isPublic, setIsPublic] = useState(false); // default private for collab sessions
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,47 +34,19 @@ export default function ShareSnippetModal({ isOpen, onClose }: ShareSnippetModal
       return;
     }
 
-    if (!user) {
-      toast.error("You must be logged in to share snippets.");
-      return;
-    }
-
-    const code = getCode();
-    if (!code || !code.trim()) {
-      toast.error("Cannot share empty code.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
+    setIsSaving(true);
     try {
-      await createSnippet({
-        userId: user.userId,
-        userName: user.name,
-        title: title.trim(),
-        language,
-        code,
-        isPublic,
-      });
-
-      toast.success(
-        isPublic
-          ? "Snippet published to Community Snippets! 🌍"
-          : "Snippet saved privately to your library 🔒"
-      );
-      setTitle("");
-      setIsPublic(true);
+      await onSave(title.trim(), isPublic);
+      setTitle(`Collaborative Session ${roomId}`);
+      setIsPublic(false);
       onClose();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to publish snippet";
-      toast.error(msg);
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md">
         <Card variant="default" className="p-6 relative shadow-level-4">
           <button
@@ -84,11 +57,11 @@ export default function ShareSnippetModal({ isOpen, onClose }: ShareSnippetModal
           </button>
 
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-link" />
-            <h2 className="text-body-md font-semibold text-ink">Share Snippet</h2>
+            <FolderPlus className="w-4 h-4 text-link" />
+            <h2 className="text-body-md font-semibold text-ink">Save to Snippets</h2>
           </div>
           <p className="text-caption text-mute mb-6">
-            Save your {language} snippet — choose who can see it.
+            Save this collaborative {language} session to your Snippets library.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -102,7 +75,7 @@ export default function ShareSnippetModal({ isOpen, onClose }: ShareSnippetModal
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Binary Search Tree Implementation"
+                placeholder="e.g. Room Session - Sorting Algorithms"
                 className="w-full h-10 px-3 bg-canvas-soft border border-hairline focus:border-link rounded-md text-ink text-body-sm placeholder:text-mute focus:outline-none transition-colors"
               />
             </div>
@@ -154,17 +127,23 @@ export default function ShareSnippetModal({ isOpen, onClose }: ShareSnippetModal
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+              <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={isSaving}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="primary"
                 size="sm"
-                loading={isSubmitting}
-                icon={<Share2 className="w-3.5 h-3.5" />}
+                disabled={isSaving}
+                icon={
+                  isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FolderPlus className="w-3.5 h-3.5" />
+                  )
+                }
               >
-                {isPublic ? "Publish Snippet" : "Save Privately"}
+                {isSaving ? "Saving..." : isPublic ? "Publish Snippet" : "Save Privately"}
               </Button>
             </div>
           </form>

@@ -19,6 +19,7 @@ import toast from "react-hot-toast";
 import { useAuthContext } from "@/components/providers/AuthProvider";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { playRoomCreatedSound } from "@/lib/soundEffects";
 
 export default function CollaborateLandingPage() {
   const router = useRouter();
@@ -46,11 +47,12 @@ export default function CollaborateLandingPage() {
         roomId: newRoomId,
         title: `Room ${newRoomId}`,
         language: "javascript",
-        code: "// Write code here...\n",
+        code: "",
         hostUserId: user.userId,
         hostUserName: user.name || "Anonymous Developer",
       });
 
+      playRoomCreatedSound();
       toast.success("Room created as Admin! Redirecting...");
       router.push(`/collaborate/${newRoomId}`);
     } catch {

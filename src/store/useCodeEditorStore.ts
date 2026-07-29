@@ -107,11 +107,17 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
 
       getCode: () => get().editor?.getValue() || "",
 
-      setEditor: (editor: Monaco) => {
-        const savedCode = localStorage.getItem(`editor-code-${get().language}`);
-        const defaultCode =
-          LANGUAGE_CONFIG[get().language]?.defaultCode || "// Hello, World!";
-        editor.setValue(savedCode || defaultCode);
+      setEditor: (editor: Monaco, preserveValue = false) => {
+        if (!preserveValue) {
+          let savedCode = localStorage.getItem(`editor-code-${get().language}`);
+          if (savedCode && (savedCode.includes("Hello") || savedCode.includes("Playground"))) {
+            localStorage.removeItem(`editor-code-${get().language}`);
+            savedCode = null;
+          }
+          const defaultCode =
+            LANGUAGE_CONFIG[get().language]?.defaultCode || "";
+          editor.setValue(savedCode || defaultCode);
+        }
 
         set({ editor });
       },
@@ -133,9 +139,13 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
             localStorage.setItem(`editor-code-${get().language}`, currentCode);
           }
 
-          const savedCode = localStorage.getItem(`editor-code-${language}`);
+          let savedCode = localStorage.getItem(`editor-code-${language}`);
+          if (savedCode && (savedCode.includes("Hello") || savedCode.includes("Playground"))) {
+            localStorage.removeItem(`editor-code-${language}`);
+            savedCode = null;
+          }
           const defaultCode =
-            LANGUAGE_CONFIG[language]?.defaultCode || "// Hello, World!";
+            LANGUAGE_CONFIG[language]?.defaultCode || "";
           const newCode = savedCode || defaultCode;
 
           if (get().editor) {
@@ -149,6 +159,9 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
           language,
           output: "",
           error: null,
+          stdin: "",
+          isRunning: false,
+          activeOutputTab: "console",
         });
       },
 

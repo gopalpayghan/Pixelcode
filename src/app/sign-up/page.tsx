@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
@@ -10,13 +10,29 @@ import { useAuthContext } from "@/components/providers/AuthProvider";
 import { ArrowRight, Lock, Mail, User, Sparkles } from "lucide-react";
 import Link from "next/link";
 
-export default function CustomSignUpPage() {
+function SignUpForm() {
   const router = useRouter();
-  const { signUp } = useAuthContext();
+  const searchParams = useSearchParams();
+  const { user, isLoading, signUp } = useAuthContext();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      const redirectTo = searchParams?.get("redirect") || "/editor";
+      router.replace(redirectTo);
+    }
+  }, [user, isLoading, router, searchParams]);
+
+  if (isLoading || user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-canvas">
+        <div className="w-8 h-8 border-2 border-hairline border-t-ink rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +43,8 @@ export default function CustomSignUpPage() {
     setLoading(false);
 
     if (success) {
-      router.push("/editor");
+      const redirectTo = searchParams?.get("redirect") || "/editor";
+      router.push(redirectTo);
     }
   };
 
@@ -131,5 +148,19 @@ export default function CustomSignUpPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CustomSignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-screen bg-canvas">
+          <div className="w-8 h-8 border-2 border-hairline border-t-ink rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <SignUpForm />
+    </Suspense>
   );
 }
