@@ -161,8 +161,54 @@ function CollaborativeRoomContent({
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showSaveSnippetModal, setShowSaveSnippetModal] = useState(false);
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [pendingTargetUrl, setPendingTargetUrl] = useState<string | null>(null);
+  const isLeavingRef = useRef(false);
 
   const isReceivingRemoteOutput = useRef(false);
+
+  // ─── Intercept link navigation & page unloads inside active room ───
+  useEffect(() => {
+    const handleAnchorClick = (e: MouseEvent) => {
+      if (isLeavingRef.current) return;
+
+      const target = (e.target as HTMLElement).closest("a");
+      if (target) {
+        const href = target.getAttribute("href");
+        if (href && !href.startsWith("#") && !href.startsWith("javascript:")) {
+          e.preventDefault();
+          e.stopPropagation();
+          setPendingTargetUrl(href);
+          setLeaveModalOpen(true);
+        }
+      }
+    };
+
+    const handlePopState = () => {
+      if (isLeavingRef.current) return;
+      window.history.pushState(null, "", window.location.href);
+      setPendingTargetUrl("/collaborate");
+      setLeaveModalOpen(true);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isLeavingRef.current) {
+        e.preventDefault();
+        e.returnValue = "You are currently in an active room. Leaving will delete the room session.";
+        return e.returnValue;
+      }
+    };
+
+    document.addEventListener("click", handleAnchorClick, true);
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("click", handleAnchorClick, true);
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   // Timer Countdown Ticker
   useEffect(() => {
@@ -432,23 +478,11 @@ function CollaborativeRoomContent({
     return () => unsubscribe();
   }, [broadcast, user?.name]);
 
-  // ─── Sync session language from Convex ───
+  // ─── Bidirectional Language Sync (Convex & Liveblocks Broadcast) ───
   useEffect(() => {
-    if (session?.language && session.language !== language) {
-      setLanguage(session.language, true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.language]);
+    if (!roomId || !session || !language) return;
 
-  // ─── Admin language change → Convex + Liveblocks broadcast ───
-  useEffect(() => {
-    if (
-      isAdmin &&
-      roomId &&
-      language &&
-      session &&
-      session.language !== language
-    ) {
+    if (session.language !== language) {
       updateSessionCodeMut({
         roomId,
         code: session.code || "",
@@ -457,8 +491,7 @@ function CollaborativeRoomContent({
 
       broadcast({ type: "LANGUAGE_CHANGED", language });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, language]);
+  }, [language, roomId, session, updateSessionCodeMut, broadcast]);
 
   // ─── Auto-redirect if room is deleted ───
   useEffect(() => {
@@ -469,11 +502,14 @@ function CollaborativeRoomContent({
     }
   }, [session, roomAdmin, router]);
 
-  // ─── Persist code changes to Convex (debounced, called by editor) ───
+  // ─── Persist code changes to Convex & localStorage (debounced, called by editor) ───
   const handleCodeChange = useCallback(
     (code: string) => {
       if (roomId) {
         updateSessionCodeMut({ roomId, code });
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`pixelcode_room_code_${roomId}`, code);
+        }
       }
     },
     [roomId, updateSessionCodeMut],
@@ -486,34 +522,50 @@ function CollaborativeRoomContent({
     setTimeout(() => setCopied(false), 2000);
   }, []);
 
-  const handleLeave = useCallback(() => {
-    const currentName = user?.name || "Guest Developer";
-    broadcast({ type: "USER_LEFT", userName: currentName });
-    router.push("/collaborate");
-  }, [broadcast, user?.name, router]);
-
-  const handleDeleteRoom = useCallback(async () => {
+  const handleConfirmLeaveRoom = useCallback(async () => {
     if (!user || !roomId) return;
-    if (
-      window.confirm(
-        "Are you sure you want to delete this room? All participants will be redirected.",
-      )
-    ) {
+    isLeavingRef.current = true;
+    setLeaveModalOpen(false);
+
+    const targetUrl = pendingTargetUrl || "/collaborate";
+
+    if (isAdmin) {
       try {
         await deleteSessionMut({ roomId, userId: user.userId });
         playRoomDeletedSound();
-        toast.success("Room session deleted");
-        router.push("/collaborate");
+        toast.success("Room session ended & deleted");
       } catch {
-        toast.error("Failed to delete room");
+        // Session might already be deleted
+      }
+    } else {
+      try {
+        await leaveSessionMut({ roomId, userId: user.userId });
+        const currentName = user.name || "Guest Developer";
+        broadcast({ type: "USER_LEFT", userName: currentName });
+      } catch {
+        // ignore
       }
     }
-  }, [user, roomId, deleteSessionMut, router]);
+
+    router.push(targetUrl);
+  }, [user, roomId, isAdmin, pendingTargetUrl, deleteSessionMut, leaveSessionMut, broadcast, router]);
+
+  const handleLeave = useCallback(() => {
+    setPendingTargetUrl("/collaborate");
+    setLeaveModalOpen(true);
+  }, []);
+
+  const handleDeleteRoom = useCallback(() => {
+    setPendingTargetUrl("/collaborate");
+    setLeaveModalOpen(true);
+  }, []);
 
   const currentSessionCode =
     session?.code !== undefined
       ? session.code
-      : useCodeEditorStore.getState().getCode();
+      : typeof window !== "undefined"
+      ? localStorage.getItem(`pixelcode_room_code_${roomId}`) || useCodeEditorStore.getState().getCode() || ""
+      : "";
 
   return (
     <div className="flex flex-col h-screen bg-canvas">
@@ -564,77 +616,6 @@ function CollaborativeRoomContent({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Room Challenge Timer Display & Menu */}
-          {timerRemainingSeconds !== null && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-link/15 border border-link/30 text-link font-mono font-bold text-xs animate-pulse">
-              <TimerIcon className="w-3.5 h-3.5" />
-              <span>
-                {Math.floor(timerRemainingSeconds / 60)}:
-                {String(timerRemainingSeconds % 60).padStart(2, "0")}
-              </span>
-            </div>
-          )}
-
-          {isAdmin && (
-            <div className="relative">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowTimerMenu((prev) => !prev)}
-                icon={<TimerIcon className="w-3.5 h-3.5" />}
-              >
-                Timer
-              </Button>
-
-              {showTimerMenu && (
-                <div className="absolute top-full right-0 mt-1.5 z-50 w-44 bg-canvas-dark border border-hairline/80 rounded-xl shadow-2xl backdrop-blur-xl p-1.5 flex flex-col gap-1 text-xs">
-                  <span className="px-2 py-1 font-semibold text-mute text-[10px] uppercase tracking-wider">
-                    Start Challenge Timer
-                  </span>
-                  {[15, 30, 45, 60].map((mins) => (
-                    <button
-                      key={mins}
-                      onClick={() => handleStartTimer(mins)}
-                      className="px-2.5 py-1.5 rounded-md text-left hover:bg-surface text-foreground transition-colors font-medium"
-                    >
-                      {mins} Minutes Sprint
-                    </button>
-                  ))}
-                  {timerRemainingSeconds !== null && (
-                    <button
-                      onClick={handleStopTimer}
-                      className="px-2.5 py-1.5 rounded-md text-left hover:bg-error/15 text-error transition-colors font-medium border-t border-hairline/50 mt-1"
-                    >
-                      Stop Timer
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 1-Click Code Export */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportCode}
-            icon={<Download className="w-3.5 h-3.5" />}
-            title="Download room code file"
-          >
-            Export
-          </Button>
-
-          {/* Save to Snippets → opens modal for title & visibility */}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleSaveToSnippets}
-            icon={<FolderPlus className="w-3.5 h-3.5" />}
-            title="Save code to your personal Snippets dashboard"
-          >
-            Save Snippet
-          </Button>
-
           {/* Admin Lock / Read-Only Toggle Button */}
           {isAdmin && (
             <Button
@@ -666,9 +647,6 @@ function CollaborativeRoomContent({
               </span>
             )}
           </Button>
-
-          {/* Voice Chat Controls */}
-          <VoiceChatControls currentUserId={user?.userId || "anonymous"} />
 
           <Button
             variant="secondary"
@@ -754,6 +732,53 @@ function CollaborativeRoomContent({
         language={language || "javascript"}
         roomId={roomId}
       />
+
+      {/* Exit Room & Session Deletion Alert Modal */}
+      {leaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-canvas/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-canvas border border-hairline rounded-2xl shadow-level-4 p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-error/15 text-error flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-body font-semibold text-ink">
+                  {isAdmin ? "End & Delete Room Session?" : "Leave Room Session?"}
+                </h3>
+                <p className="text-caption text-mute mt-0.5">
+                  Room Code: <span className="font-mono text-ink font-semibold">{roomId}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-canvas-soft border border-hairline rounded-xl text-body-sm text-body font-medium">
+              {isAdmin
+                ? "Leaving will delete this room session for all members. Do you want to delete and leave?"
+                : "Do you want to leave this room session?"}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setLeaveModalOpen(false);
+                  setPendingTargetUrl(null);
+                }}
+              >
+                Stay
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleConfirmLeaveRoom}
+              >
+                {isAdmin ? "Exit" : "Leave Room"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

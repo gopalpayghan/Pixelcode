@@ -8,10 +8,8 @@ export default defineSchema({
     name: v.string(),
     passwordHash: v.optional(v.string()),
     avatar: v.optional(v.string()),
-    isPro: v.boolean(),
+    isPro: v.optional(v.boolean()),
     proSince: v.optional(v.number()),
-    lemonSqueezyCustomerId: v.optional(v.string()),
-    lemonSqueezyOrderId: v.optional(v.string()),
   })
     .index("by_user_id", ["userId"])
     .index("by_email", ["email"]),

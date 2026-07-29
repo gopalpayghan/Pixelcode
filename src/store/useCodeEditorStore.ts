@@ -140,7 +140,14 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
           }
 
           let savedCode = localStorage.getItem(`editor-code-${language}`);
-          if (savedCode && (savedCode.includes("Hello") || savedCode.includes("Playground"))) {
+          if (
+            savedCode &&
+            (savedCode.includes("languageName") ||
+              savedCode.includes("SwiftUI") ||
+              savedCode.includes("version = 6.1") ||
+              savedCode.includes("Hello") ||
+              savedCode.includes("Playground"))
+          ) {
             localStorage.removeItem(`editor-code-${language}`);
             savedCode = null;
           }

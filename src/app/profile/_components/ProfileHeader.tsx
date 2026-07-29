@@ -21,12 +21,10 @@ interface ProfileHeaderProps {
     _id: Id<"users">;
     _creationTime: number;
     proSince?: number | undefined;
-    lemonSqueezyCustomerId?: string | undefined;
-    lemonSqueezyOrderId?: string | undefined;
     name: string;
     userId: string;
     email: string;
-    isPro: boolean;
+    isPro?: boolean;
   };
   user: {
     userId: string;
@@ -94,25 +92,14 @@ function ProfileHeader({ userStats, userData, user }: ProfileHeaderProps) {
                 {user.name.charAt(0)}
               </div>
             )}
-            {userData.isPro && (
-              <div className="absolute -top-1 -right-1 bg-link text-white p-1.5 rounded-full shadow-level-2">
-                <Zap className="w-3.5 h-3.5 fill-current" />
-              </div>
-            )}
           </div>
 
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-display-md text-ink">{userData.name}</h1>
-              {userData.isPro ? (
-                <span className="px-2.5 py-0.5 bg-link/10 text-link border border-link/20 rounded-full text-caption font-medium">
-                  Pro Member
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 bg-canvas-soft border border-hairline text-mute rounded-full text-caption">
-                  Free Plan
-                </span>
-              )}
+              <span className="px-2.5 py-0.5 bg-link/10 text-link border border-link/20 rounded-full text-caption font-medium">
+                Developer
+              </span>
             </div>
             <p className="text-body-sm text-mute flex items-center gap-1.5">
               <UserIcon className="w-3.5 h-3.5" />

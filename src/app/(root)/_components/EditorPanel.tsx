@@ -167,8 +167,19 @@ function EditorPanel() {
   ]);
 
   useEffect(() => {
-    const savedCode = localStorage.getItem(`editor-code-${language}`);
-    const newCode = savedCode || LANGUAGE_CONFIG[language].defaultCode;
+    let savedCode = localStorage.getItem(`editor-code-${language}`);
+    if (
+      savedCode &&
+      (savedCode.includes("languageName") ||
+        savedCode.includes("SwiftUI") ||
+        savedCode.includes("version = 6.1") ||
+        savedCode.includes("Hello") ||
+        savedCode.includes("Playground"))
+    ) {
+      localStorage.removeItem(`editor-code-${language}`);
+      savedCode = null;
+    }
+    const newCode = savedCode || LANGUAGE_CONFIG[language]?.defaultCode || "";
     if (editor) editor.setValue(newCode);
   }, [language, editor]);
 

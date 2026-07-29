@@ -54,6 +54,11 @@ export default function CodePanel() {
           defaultValue={currentLang.defaultCode}
           theme={theme}
           onMount={handleEditorMount}
+          onChange={(value) => {
+            if (value !== undefined) {
+              localStorage.setItem(`editor-code-${language}`, value);
+            }
+          }}
           options={{
             fontSize: fontSize,
             minimap: { enabled: false },
