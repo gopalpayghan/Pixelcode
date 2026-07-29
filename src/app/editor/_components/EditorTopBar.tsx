@@ -14,7 +14,11 @@ import useMounted from "@/hooks/useMounted";
 import ShareSnippetModal from "./ShareSnippetModal";
 import { playChatMessageSound, playRoomCreatedSound } from "@/lib/soundEffects";
 
-export default function EditorTopBar() {
+interface EditorTopBarProps {
+  roomId?: string;
+}
+
+export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
   const mounted = useMounted();
   const router = useRouter();
   const { user } = useAuthContext();
@@ -36,8 +40,24 @@ export default function EditorTopBar() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
-  // Timer & Export State
-  const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
+  const timerStorageKey = roomId
+    ? `pixelcode_room_timer_end_${roomId}`
+    : "pixelcode_solo_timer_end";
+
+  // Timer & Export State with localStorage persistence across page reloads
+  const [timerEndTime, setTimerEndTime] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const savedEndTime = localStorage.getItem(timerStorageKey);
+    if (savedEndTime) {
+      const endTimeNum = Number(savedEndTime);
+      if (endTimeNum > Date.now()) {
+        return endTimeNum;
+      } else {
+        localStorage.removeItem(timerStorageKey);
+      }
+    }
+    return null;
+  });
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
 
@@ -50,29 +70,40 @@ export default function EditorTopBar() {
       return;
     }
 
-    const interval = setInterval(() => {
+    const updateTimer = () => {
       const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
       setTimerRemainingSeconds(remaining);
 
       if (remaining === 0) {
         setTimerEndTime(null);
+        localStorage.removeItem(timerStorageKey);
         playRoomCreatedSound();
-        toast("⏱️ Time's up! Solo coding challenge timer completed.", { icon: "🎉" });
+        toast("⏱️ Time's up! Challenge timer completed.", { icon: "🎉" });
       }
-    }, 1000);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [timerEndTime]);
+  }, [timerEndTime, timerStorageKey]);
 
   const handleStartTimer = (durationMinutes: number) => {
     const endTime = Date.now() + durationMinutes * 60 * 1000;
     setTimerEndTime(endTime);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(timerStorageKey, endTime.toString());
+    }
     setShowTimerMenu(false);
-    toast.success(`Started ${durationMinutes}m solo challenge timer!`);
+    toast.success(`Started ${durationMinutes}m challenge timer!`);
   };
 
   const handleStopTimer = () => {
     setTimerEndTime(null);
+    setTimerRemainingSeconds(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(timerStorageKey);
+    }
     setShowTimerMenu(false);
     toast("Timer stopped", { icon: "⏱️" });
   };

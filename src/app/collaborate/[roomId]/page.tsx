@@ -596,7 +596,7 @@ function CollaborativeRoomContent({
         </div>
       </div>
 
-      <EditorTopBar />
+      <EditorTopBar roomId={roomId} />
 
       {/* Main editor area — Draggable Resizable Splitter between Code Editor and Output Console */}
       <ResizableEditorLayout
