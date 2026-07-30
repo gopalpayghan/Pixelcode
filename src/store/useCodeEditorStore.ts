@@ -110,13 +110,18 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       setEditor: (editor: Monaco, preserveValue = false) => {
         if (!preserveValue) {
           let savedCode = localStorage.getItem(`editor-code-${get().language}`);
-          if (savedCode && (savedCode.includes("Hello") || savedCode.includes("Playground"))) {
+          if (
+            savedCode &&
+            (savedCode.includes("languageName") ||
+              savedCode.includes("SwiftUI") ||
+              savedCode.includes("version = 6.1"))
+          ) {
             localStorage.removeItem(`editor-code-${get().language}`);
             savedCode = null;
           }
           const defaultCode =
             LANGUAGE_CONFIG[get().language]?.defaultCode || "";
-          editor.setValue(savedCode || defaultCode);
+          editor.setValue(savedCode !== null ? savedCode : defaultCode);
         }
 
         set({ editor });
@@ -135,7 +140,7 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
       setLanguage: (language: string, preserveCode = false) => {
         if (!preserveCode) {
           const currentCode = get().editor?.getValue();
-          if (currentCode) {
+          if (currentCode !== undefined && currentCode !== null) {
             localStorage.setItem(`editor-code-${get().language}`, currentCode);
           }
 
@@ -144,16 +149,14 @@ export const useCodeEditorStore = create<EnhancedCodeEditorState>(
             savedCode &&
             (savedCode.includes("languageName") ||
               savedCode.includes("SwiftUI") ||
-              savedCode.includes("version = 6.1") ||
-              savedCode.includes("Hello") ||
-              savedCode.includes("Playground"))
+              savedCode.includes("version = 6.1"))
           ) {
             localStorage.removeItem(`editor-code-${language}`);
             savedCode = null;
           }
           const defaultCode =
             LANGUAGE_CONFIG[language]?.defaultCode || "";
-          const newCode = savedCode || defaultCode;
+          const newCode = savedCode !== null ? savedCode : defaultCode;
 
           if (get().editor) {
             get().editor.setValue(newCode);

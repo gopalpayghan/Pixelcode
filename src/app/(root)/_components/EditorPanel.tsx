@@ -172,14 +172,12 @@ function EditorPanel() {
       savedCode &&
       (savedCode.includes("languageName") ||
         savedCode.includes("SwiftUI") ||
-        savedCode.includes("version = 6.1") ||
-        savedCode.includes("Hello") ||
-        savedCode.includes("Playground"))
+        savedCode.includes("version = 6.1"))
     ) {
       localStorage.removeItem(`editor-code-${language}`);
       savedCode = null;
     }
-    const newCode = savedCode || LANGUAGE_CONFIG[language]?.defaultCode || "";
+    const newCode = savedCode !== null ? savedCode : (LANGUAGE_CONFIG[language]?.defaultCode || "");
     if (editor) editor.setValue(newCode);
   }, [language, editor]);
 
