@@ -24,7 +24,7 @@ const CollaborativeCodeEditor = dynamic(
         Loading Collaborative Editor...
       </div>
     ),
-  }
+  },
 );
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import {
@@ -49,7 +49,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
-import RoomChatPanel, { ChatMessage } from "@/app/collaborate/_components/RoomChatPanel";
+import RoomChatPanel, {
+  ChatMessage,
+} from "@/app/collaborate/_components/RoomChatPanel";
 import SaveSnippetModal from "@/app/collaborate/_components/SaveSnippetModal";
 import {
   playRoomCreatedSound,
@@ -59,11 +61,7 @@ import {
 } from "@/lib/soundEffects";
 
 // ─── Inner room content (must be inside RoomProvider) ───
-function CollaborativeRoomContent({
-  roomId,
-}: {
-  roomId: string;
-}) {
+function CollaborativeRoomContent({ roomId }: { roomId: string }) {
   const router = useRouter();
   const { user } = useAuthContext();
 
@@ -73,7 +71,9 @@ function CollaborativeRoomContent({
   // ─── Convex queries & mutations ───
   const joinSessionMut = useMutation(api.collaborativeSessions.joinSession);
   const createSessionMut = useMutation(api.collaborativeSessions.createSession);
-  const updateSessionCodeMut = useMutation(api.collaborativeSessions.updateSessionCode);
+  const updateSessionCodeMut = useMutation(
+    api.collaborativeSessions.updateSessionCode,
+  );
   const deleteSessionMut = useMutation(api.collaborativeSessions.deleteSession);
   const heartbeatMut = useMutation(api.collaborativeSessions.heartbeat);
   const createSnippetMut = useMutation(api.snippets.createSnippet);
@@ -186,7 +186,8 @@ function CollaborativeRoomContent({
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (!isLeavingRef.current) {
         e.preventDefault();
-        e.returnValue = "You are currently in an active room. Leaving will delete the room session.";
+        e.returnValue =
+          "You are currently in an active room. Leaving will delete the room session.";
         return e.returnValue;
       }
     };
@@ -201,8 +202,6 @@ function CollaborativeRoomContent({
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
-
-
 
   // ─── Liveblocks Event Listener ───
   useEventListener(({ event }: { event: RoomEvent }) => {
@@ -220,7 +219,9 @@ function CollaborativeRoomContent({
         toast.error("You were removed from the room by the admin.");
         router.push("/collaborate");
       } else {
-        toast(`${event.targetUserName} was removed from the room`, { icon: "🚪" });
+        toast(`${event.targetUserName} was removed from the room`, {
+          icon: "🚪",
+        });
       }
     } else if (event.type === "CHAT_MESSAGE") {
       playChatMessageSound();
@@ -239,7 +240,7 @@ function CollaborativeRoomContent({
         event.isLocked
           ? `Room set to Read-Only Presentation Mode by ${event.lockedBy}`
           : `Room unlocked for Open Collaboration by ${event.lockedBy}`,
-        { icon: event.isLocked ? "🔒" : "🔓" }
+        { icon: event.isLocked ? "🔒" : "🔓" },
       );
     } else if (event.type === "OUTPUT_UPDATED") {
       isReceivingRemoteOutput.current = true;
@@ -254,13 +255,17 @@ function CollaborativeRoomContent({
     }
   });
 
-  const handleSaveToSnippetsConfirmed = async (title: string, isPublic: boolean) => {
+  const handleSaveToSnippetsConfirmed = async (
+    title: string,
+    isPublic: boolean,
+  ) => {
     if (!user) {
       toast.error("Please sign in to save snippets");
       return;
     }
 
-    const editorCode = useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
+    const editorCode =
+      useCodeEditorStore.getState().editor?.getValue() || session?.code || "";
     if (!editorCode.trim()) {
       toast.error("Code editor is empty");
       return;
@@ -279,7 +284,7 @@ function CollaborativeRoomContent({
     toast.success(
       isPublic
         ? "Snippet published to Community Snippets! 🌍"
-        : "Snippet saved privately to your library 🔒"
+        : "Snippet saved privately to your library 🔒",
     );
   };
 
@@ -314,7 +319,7 @@ function CollaborativeRoomContent({
     toast.success(
       nextLocked
         ? "Room locked to Read-Only Presentation mode"
-        : "Room unlocked for Open Collaboration"
+        : "Room unlocked for Open Collaboration",
     );
   };
 
@@ -457,7 +462,16 @@ function CollaborativeRoomContent({
     }
 
     router.push(targetUrl);
-  }, [user, roomId, isAdmin, pendingTargetUrl, deleteSessionMut, leaveSessionMut, broadcast, router]);
+  }, [
+    user,
+    roomId,
+    isAdmin,
+    pendingTargetUrl,
+    deleteSessionMut,
+    leaveSessionMut,
+    broadcast,
+    router,
+  ]);
 
   const handleLeave = useCallback(() => {
     setPendingTargetUrl("/collaborate");
@@ -473,8 +487,10 @@ function CollaborativeRoomContent({
     session?.code !== undefined
       ? session.code
       : typeof window !== "undefined"
-      ? localStorage.getItem(`pixelcode_room_code_${roomId}`) || useCodeEditorStore.getState().getCode() || ""
-      : "";
+        ? localStorage.getItem(`pixelcode_room_code_${roomId}`) ||
+          useCodeEditorStore.getState().getCode() ||
+          ""
+        : "";
 
   return (
     <div className="flex flex-col h-screen bg-canvas">
@@ -516,9 +532,9 @@ function CollaborativeRoomContent({
           <span className="text-hairline">|</span>
 
           {/* Live avatars (Liveblocks-powered with Admin Kick Controls) */}
-          <LiveAvatars 
-            isAdmin={isAdmin} 
-            onKickUser={handleKickUser} 
+          <LiveAvatars
+            isAdmin={isAdmin}
+            onKickUser={handleKickUser}
             onFollowUser={handleFollowUser}
             followedUserName={followedUserName}
           />
@@ -531,8 +547,16 @@ function CollaborativeRoomContent({
               variant="secondary"
               size="sm"
               onClick={handleToggleLock}
-              icon={isLocked ? <Lock className="w-3.5 h-3.5 text-warning" /> : <Unlock className="w-3.5 h-3.5 text-success" />}
-              className={isLocked ? "border-warning text-warning font-semibold" : ""}
+              icon={
+                isLocked ? (
+                  <Lock className="w-3.5 h-3.5 text-warning" />
+                ) : (
+                  <Unlock className="w-3.5 h-3.5 text-success" />
+                )
+              }
+              className={
+                isLocked ? "border-warning text-warning font-semibold" : ""
+              }
             >
               {isLocked ? "Locked Mode" : "Open Editing"}
             </Button>
@@ -547,7 +571,9 @@ function CollaborativeRoomContent({
               setUnreadCount(0);
             }}
             icon={<MessageSquare className="w-3.5 h-3.5" />}
-            className={unreadCount > 0 ? "border-link text-link font-semibold" : ""}
+            className={
+              unreadCount > 0 ? "border-link text-link font-semibold" : ""
+            }
           >
             Chat
             {unreadCount > 0 && (
@@ -652,10 +678,15 @@ function CollaborativeRoomContent({
               </div>
               <div>
                 <h3 className="text-body-md font-semibold text-ink">
-                  {isAdmin ? "End & Delete Room Session?" : "Leave Room Session?"}
+                  {isAdmin
+                    ? "End & Delete Room Session?"
+                    : "Leave Room Session?"}
                 </h3>
                 <p className="text-caption text-mute mt-0.5">
-                  Room Code: <span className="font-mono text-ink font-semibold">{roomId}</span>
+                  Room Code:{" "}
+                  <span className="font-mono text-ink font-semibold">
+                    {roomId}
+                  </span>
                 </p>
               </div>
             </div>

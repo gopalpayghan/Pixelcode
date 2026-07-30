@@ -3,7 +3,17 @@
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { LANGUAGE_CONFIG, THEMES } from "@/lib/constants";
 import { Button } from "@/components/ui/Button";
-import { Play, Share2, Sliders, Check, ChevronDown, Users2, Loader2, Download, Timer } from "lucide-react";
+import {
+  Play,
+  Share2,
+  Sliders,
+  Check,
+  ChevronDown,
+  Users2,
+  Loader2,
+  Download,
+  Timer,
+} from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
@@ -58,7 +68,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
     }
     return null;
   });
-  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<
+    number | null
+  >(null);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,7 +83,10 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
     }
 
     const updateTimer = () => {
-      const remaining = Math.max(0, Math.ceil((timerEndTime - Date.now()) / 1000));
+      const remaining = Math.max(
+        0,
+        Math.ceil((timerEndTime - Date.now()) / 1000),
+      );
       setTimerRemainingSeconds(remaining);
 
       if (remaining === 0) {
@@ -115,7 +130,8 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
       return;
     }
 
-    const currentLangConfig = LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.javascript;
+    const currentLangConfig =
+      LANGUAGE_CONFIG[language] || LANGUAGE_CONFIG.javascript;
     const blob = new Blob([editorCode], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -135,8 +151,12 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
     if (!mounted) return;
 
     const syncTheme = (mode?: "dark" | "light") => {
-      const siteTheme = mode || (localStorage.getItem("pixelcode-site-theme") as "dark" | "light") ||
-        (document.documentElement.classList.contains("light") ? "light" : "dark");
+      const siteTheme =
+        mode ||
+        (localStorage.getItem("pixelcode-site-theme") as "dark" | "light") ||
+        (document.documentElement.classList.contains("light")
+          ? "light"
+          : "dark");
 
       if (siteTheme === "light") {
         setTheme("vs-light");
@@ -163,7 +183,10 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setIsLangOpen(false);
         setIsThemeOpen(false);
       }
@@ -175,8 +198,10 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
     };
   }, []);
 
-  const currentLang = (mounted ? LANGUAGE_CONFIG[language] : null) || LANGUAGE_CONFIG.javascript;
-  const currentThemeObj = (mounted ? THEMES.find((t) => t.id === theme) : null) || THEMES[0];
+  const currentLang =
+    (mounted ? LANGUAGE_CONFIG[language] : null) || LANGUAGE_CONFIG.javascript;
+  const currentThemeObj =
+    (mounted ? THEMES.find((t) => t.id === theme) : null) || THEMES[0];
   const currentFontSize = mounted ? fontSize : 16;
 
   const handleShare = () => {
@@ -203,7 +228,10 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
         hostUserName: user.name || "Developer",
       });
 
-      toast.success("Collaborative room created! Switching to collaborate mode...", { icon: "🚀" });
+      toast.success(
+        "Collaborative room created! Switching to collaborate mode...",
+        { icon: "🚀" },
+      );
       router.push(`/collaborate/${roomId}`);
     } catch {
       toast.error("Failed to create collaborative room");
@@ -235,7 +263,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                 className="w-4 h-4 object-contain"
               />
               <span>{currentLang.label}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isLangOpen ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isLangOpen ? "rotate-180" : ""}`}
+              />
             </button>
 
             {isLangOpen && (
@@ -249,7 +279,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                       setIsLangOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-body-sm hover:bg-canvas-soft-2 transition-colors ${
-                      language === lang.id ? "text-ink bg-canvas-soft font-medium" : "text-body"
+                      language === lang.id
+                        ? "text-ink bg-canvas-soft font-medium"
+                        : "text-body"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -260,7 +292,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                       />
                       <span>{lang.label}</span>
                     </div>
-                    {language === lang.id && <Check className="w-3.5 h-3.5 text-link" />}
+                    {language === lang.id && (
+                      <Check className="w-3.5 h-3.5 text-link" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -282,7 +316,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                 style={{ backgroundColor: currentThemeObj.color }}
               />
               <span>{currentThemeObj.label}</span>
-              <ChevronDown className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isThemeOpen ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-mute ml-1 transition-transform ${isThemeOpen ? "rotate-180" : ""}`}
+              />
             </button>
 
             {isThemeOpen && (
@@ -296,7 +332,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                       setIsThemeOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 text-body-sm hover:bg-canvas-soft-2 transition-colors ${
-                      theme === t.id ? "text-ink bg-canvas-soft font-medium" : "text-body"
+                      theme === t.id
+                        ? "text-ink bg-canvas-soft font-medium"
+                        : "text-body"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -306,7 +344,9 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
                       />
                       <span>{t.label}</span>
                     </div>
-                    {theme === t.id && <Check className="w-3.5 h-3.5 text-link" />}
+                    {theme === t.id && (
+                      <Check className="w-3.5 h-3.5 text-link" />
+                    )}
                   </button>
                 ))}
               </div>

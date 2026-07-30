@@ -60,10 +60,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const { user } = useAuthContext();
 
   useEffect(() => {
-    if (
-      process.env.NODE_ENV === "production" ||
-      process.env.NEXT_PUBLIC_ENABLE_SOCKETIO === "true"
-    ) {
+    if (process.env.NEXT_PUBLIC_ENABLE_SOCKETIO === "true") {
       const socketUrl =
         process.env.NODE_ENV === "production"
           ? process.env.NEXT_PUBLIC_VERCEL_URL
