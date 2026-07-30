@@ -222,6 +222,40 @@ export const leaveSession = mutation({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    // Check if the user leaving is the admin/host of this room
+    const sessions = await ctx.db
+      .query("collaborativeSessions")
+      .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
+      .collect();
+
+    const isHost = sessions.some((s) => s.hostUserId === args.userId);
+
+    if (isHost) {
+      // Admin is exiting -> Purge all room data from DB
+      const participants = await ctx.db
+        .query("roomParticipants")
+        .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
+        .collect();
+
+      for (const p of participants) {
+        await ctx.db.delete(p._id);
+      }
+
+      const requests = await ctx.db
+        .query("changeRequests")
+        .withIndex("by_room_id", (q) => q.eq("roomId", args.roomId))
+        .collect();
+
+      for (const r of requests) {
+        await ctx.db.delete(r._id);
+      }
+
+      for (const s of sessions) {
+        await ctx.db.delete(s._id);
+      }
+      return;
+    }
+
     const participant = await ctx.db
       .query("roomParticipants")
       .withIndex("by_room_and_user", (q) =>
