@@ -273,3 +273,15 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* ─── Hide Liveblocks Watermark Badge ─── */
+[data-liveblocks-badge],
+.lb-badge,
+[class*="liveblocks-badge"],
+[class*="lb-badge"],
+a[href*="liveblocks.io"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
