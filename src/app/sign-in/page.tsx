@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import NavigationHeader from "@/components/NavigationHeader";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +11,6 @@ import { ArrowRight, Lock, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading, signIn } = useAuthContext();
   const [email, setEmail] = useState("");
@@ -21,9 +20,9 @@ function SignInForm() {
   useEffect(() => {
     if (!isLoading && user) {
       const redirectTo = searchParams?.get("redirect") || "/editor";
-      router.replace(redirectTo);
+      window.location.href = redirectTo;
     }
-  }, [user, isLoading, router, searchParams]);
+  }, [user, isLoading, searchParams]);
 
   if (isLoading || user) {
     return (
@@ -42,10 +41,8 @@ function SignInForm() {
     setLoading(false);
 
     if (success) {
-      // Redirect to the original page the user was trying to access,
-      // or fall back to /editor
       const redirectTo = searchParams?.get("redirect") || "/editor";
-      router.push(redirectTo);
+      window.location.href = redirectTo;
     }
   };
 

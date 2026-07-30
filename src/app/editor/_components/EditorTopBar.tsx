@@ -428,22 +428,24 @@ export default function EditorTopBar({ roomId }: EditorTopBarProps = {}) {
             Export
           </Button>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleCollaborate}
-            disabled={isCreatingRoom}
-            icon={
-              isCreatingRoom ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Users2 className="w-3.5 h-3.5" />
-              )
-            }
-            title="Open this code in a new collaborative room"
-          >
-            {isCreatingRoom ? "Creating Room..." : "Collaborate Mode"}
-          </Button>
+          {!roomId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleCollaborate}
+              disabled={isCreatingRoom}
+              icon={
+                isCreatingRoom ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Users2 className="w-3.5 h-3.5" />
+                )
+              }
+              title="Open this code in a new collaborative room"
+            >
+              {isCreatingRoom ? "Creating Room..." : "Collaborate Mode"}
+            </Button>
+          )}
 
           <Button
             variant="secondary"
