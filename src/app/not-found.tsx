@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import NavigationHeader from "@/components/NavigationHeader";
-import { Code2, ArrowLeft, Home, Sparkles, FileQuestion } from "lucide-react";
+import { Code2, Home, FileQuestion } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function NotFound() {
@@ -52,7 +52,7 @@ export default function NotFound() {
               <div className="w-3 h-3 rounded-full bg-success/80" />
               <span className="text-mute text-[11px] ml-auto">router.ts</span>
             </div>
-            <p className="text-mute">// Request Exception</p>
+            <p className="text-mute">{"// Request Exception"}</p>
             <p>
               <span className="text-error">const</span> page = <span className="text-link">await</span> router.fetch(<span className="text-warning">&quot;/requested-route-404&quot;</span>);
             </p>
